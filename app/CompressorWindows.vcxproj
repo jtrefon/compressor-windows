@@ -42,8 +42,10 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
-      <!-- Engine include dir comes from CMake via /p:EngineIncludeDir=... -->
-      <AdditionalIncludeDirectories>$(EngineIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- Engine include dir comes from CMake via /p:EngineIncludeDir=...;
+           $(IntDir)/$(OutDir)/Generated Files hold the XAML-compiler and
+           C++/WinRT generated headers. -->
+      <AdditionalIncludeDirectories>$(EngineIncludeDir);$(ProjectDir);$(IntDir);$(OutDir);$(OutDir)Generated Files;$(OutDir)Generated Files\winrt;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <WarningLevel>Level4</WarningLevel>
     </ClCompile>
