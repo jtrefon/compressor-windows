@@ -7,6 +7,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # --- Engine dependency: exact tag pin (see docs/PORTING.md in the engine) ---
 set(COMPRESSIONLIB_TAG "v1.6.4" CACHE STRING
     "compressionlib engine tag to pin (exact tag, never a branch)")
+if(NOT COMPRESSIONLIB_TAG MATCHES "^v[0-9]+\.[0-9]+\.[0-9]+$")
+    message(FATAL_ERROR
+        "COMPRESSIONLIB_TAG must be an exact vX.Y.Z tag (got: ${COMPRESSIONLIB_TAG})")
+endif()
 include(FetchContent)
 FetchContent_Declare(
     compressionlib
