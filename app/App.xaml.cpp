@@ -32,7 +32,8 @@ int RunHeadless(const std::vector<std::wstring> &args) {
     if (args[0] == L"compress") {
       compression::CompressionOptions options;
       if (args.size() == 4) {
-        options.codec = compression::codec::CodecRegistry::instance().idOf(args[3]);
+        const std::string codecName(args[3].begin(), args[3].end());
+        options.codec = compression::codec::CodecRegistry::instance().idOf(codecName);
         if (options.codec == compression::format::AlgorithmID::UNKNOWN) {
           fprintf(stderr, "unknown codec: %ls\n", args[3].c_str());
           return 2;
