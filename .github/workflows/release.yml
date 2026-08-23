@@ -42,6 +42,22 @@ jobs:
         if ($vc) { Copy-Item (Join-Path (Split-Path $vc.FullName) '*.dll') dist\CompressorWindows\ }
         if (-not (Test-Path dist\CompressorWindows\CompressorWindows.exe)) { throw "app exe missing" }
 
+    - name: Sign executable (optional; enable with SIGNING_CERT_BASE64 + SIGNING_CERT_PASSWORD secrets)
+      shell: pwsh
+      run: |
+        if ($env:SIGNING_CERT_BASE64 -and $env:SIGNING_CERT_PASSWORD) {
+          $cert = "dist\code_sign.pfx"
+          [IO.File]::WriteAllBytes($cert, [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw "signtool not found" }
+          & $signtool.FullName sign /f $cert /p $env:SIGNING_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v dist\CompressorWindows\CompressorWindows.exe
+          if ($LASTEXITCODE -ne 0) { throw "signtool failed: $LASTEXITCODE" }
+          Remove-Item $cert -Force
+          Write-Host "SIGNED EXE OK"
+        } else {
+          Write-Host "SIGNING SKIPPED (set SIGNING_CERT_BASE64/SIGNING_CERT_PASSWORD to enable)"
+        }
+
     - name: "E2E: staged portable executable round trip (headless mode)"
       shell: pwsh
       run: |
@@ -102,6 +118,22 @@ jobs:
         Start-Sleep -Seconds 3
         if (Test-Path "$inst") { throw "uninstaller did not remove the install directory" }
         Write-Host "INSTALLER VERIFICATION OK"
+
+    - name: Sign installer (optional; same secrets as the exe)
+      shell: pwsh
+      run: |
+        if ($env:SIGNING_CERT_BASE64 -and $env:SIGNING_CERT_PASSWORD) {
+          $cert = "dist\code_sign.pfx"
+          [IO.File]::WriteAllBytes($cert, [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $signtool) { throw "signtool not found" }
+          & $signtool.FullName sign /f $cert /p $env:SIGNING_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v CompressorWindows-${{ github.ref_name }}-setup.exe
+          if ($LASTEXITCODE -ne 0) { throw "signtool installer failed: $LASTEXITCODE" }
+          Remove-Item $cert -Force
+          Write-Host "SIGNED INSTALLER OK"
+        } else {
+          Write-Host "INSTALLER SIGNING SKIPPED"
+        }
 
     - name: Compute checksums
       run: |

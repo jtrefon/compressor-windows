@@ -6,7 +6,27 @@ Native Windows desktop UI (**WinUI 3, C++/WinRT**) for
 This repository is **UI only**: the engine is consumed as a pinned dependency
 (`FetchContent`, exact tag — see `CMakeLists.txt`). All compression, archive,
 format and integrity logic lives in the engine. No Qt, no third-party UI
-framework — pure Windows App SDK (Fluent native look, MSIX-ready).
+framework — pure Windows App SDK (Fluent native look).
+
+## Features
+
+- Compress / decompress any file with the strategy of your choice (list
+  generated from `CodecRegistry`), with real per-chunk progress and CRC
+  verification surfaced in the UI
+- Native file pickers (open / save), archive picker and folder picker
+- `.cza` archives: create from multiple files, open & verify every block,
+  list entries, extract a selected entry (path-traversal safe)
+- Unpackaged + self-contained (`WindowsAppSDKSelfContained=true`): standalone
+  executable, no runtime install required
+- App icon, per-monitor DPI aware
+
+### Code signing
+
+The release pipeline signs the executable and installer **when** the
+`SIGNING_CERT_BASE64` and `SIGNING_CERT_PASSWORD` repository secrets are set
+(SHA-256 + RFC 3161 timestamping via signtool). Without them the build still
+produces and publishes unsigned artifacts (SmartScreen will warn users until a
+real code-signing certificate is provided).
 
 ## Build (Windows, VS 2022+)
 
