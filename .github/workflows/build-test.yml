@@ -26,10 +26,16 @@ jobs:
     - name: Build engine, contract test and WinUI app
       run: cmake --build build --config Release --target winui_app contract_test -j2
 
-    - name: Print generated XAML header (debug)
+    - name: Print generated files (debug)
       if: failure()
       shell: pwsh
-      run: Get-Content "app\Generated Files\MainWindow.xaml.g.h" -ErrorAction SilentlyContinue | Select-Object -First 45
+      run: |
+        Get-ChildItem -Path app -Recurse -Filter "CompressorWindows.h" | Select-Object -ExpandProperty FullName
+        Get-ChildItem -Path app -Recurse -Filter "CompressorWindows.2.h" | Select-Object -ExpandProperty FullName
+        Get-ChildItem -Path app -Recurse -Filter "*.g.hpp" | Select-Object -ExpandProperty FullName
+        $h = Get-ChildItem -Path app -Recurse -Filter "CompressorWindows.2.h" | Select-Object -First 1
+        if ($h) { Select-String -Path $h.FullName -Pattern "MainWindow_base" | Select-Object -First 6 | ForEach-Object { $_.Line.Trim() } }
+        Get-ChildItem -Path app -Recurse -Filter "MainWindow.winmd" | Select-Object -ExpandProperty FullName
 
     - name: Run contract tests (anti-corruption gate)
       working-directory: build
