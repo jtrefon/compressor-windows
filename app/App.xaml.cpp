@@ -155,14 +155,17 @@ int RunUiTest(const std::vector<std::wstring> &args) {
   const bool outputExists = std::filesystem::exists(std::filesystem::path(outPath));
   wprintf(L"ui status: %ls\n", status.c_str());
   fflush(stdout);
-  if (!ok || !outputExists) {
+  const int code = (!ok || !outputExists) ? 1 : 0;
+  if (code != 0) {
     fprintf(stderr, "UI TEST FAILED (status='%ls', output=%s)\n",
             status.c_str(), outputExists ? "yes" : "no");
-    return 1;
+    fflush(stderr);
   }
-  printf("UI TEST OK\n");
-  fflush(stdout);
-  return 0;
+  // Tear the XAML window down before exiting so the framework does not crash
+  // during process teardown.
+  window.Close();
+  Sleep(500);
+  return code;
 }
 
 } // namespace
