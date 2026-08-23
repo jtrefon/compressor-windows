@@ -303,7 +303,8 @@ void App::OnLaunched(LaunchActivatedEventArgs const &) {
   }
   if (argv != nullptr && argc > 1 &&
       (wcscmp(argv[1], L"compress") == 0 ||
-       wcscmp(argv[1], L"decompress") == 0)) {
+       wcscmp(argv[1], L"decompress") == 0 ||
+       wcscmp(argv[1], L"archive") == 0)) {
     std::vector<std::wstring> args;
     for (int i = 1; i < argc; ++i) {
       args.emplace_back(argv[i]);
