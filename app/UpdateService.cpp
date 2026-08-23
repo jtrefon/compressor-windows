@@ -39,8 +39,7 @@ bool IsNewerVersion(const std::wstring &current, const std::wstring &candidate) 
   return false;
 }
 
-winrt::Windows::Foundation::IAsyncOperation<UpdateInfo> CheckForUpdate() {
-  UpdateInfo info;
+winrt::Windows::Foundation::IAsyncOperation<bool> CheckForUpdate(UpdateInfo &out) {
   try {
     winrt::Windows::Web::Http::HttpClient client;
     client.DefaultRequestHeaders().UserAgent().ParseAdd(L"CompressorWindows");
@@ -48,7 +47,7 @@ winrt::Windows::Foundation::IAsyncOperation<UpdateInfo> CheckForUpdate() {
         L"https://api.github.com/repos/jtrefon/compressor-windows/releases/latest");
     const auto response = co_await client.GetAsync(uri);
     if (!response.IsSuccessStatusCode()) {
-      co_return info;
+      co_return false;
     }
     const auto body = co_await response.Content().ReadAsStringAsync();
     const auto root = winrt::Windows::Data::Json::JsonObject::Parse(body);
@@ -56,7 +55,7 @@ winrt::Windows::Foundation::IAsyncOperation<UpdateInfo> CheckForUpdate() {
     const std::wstring page(root.GetNamedString(L"html_url", L""));
     const std::wstring notes(root.GetNamedString(L"body", L""));
     if (tag.empty() || !IsNewerVersion(kAppVersion, tag)) {
-      co_return info;
+      co_return false;
     }
     std::wstring downloadUrl;
     if (root.HasKey(L"assets")) {
@@ -70,15 +69,15 @@ winrt::Windows::Foundation::IAsyncOperation<UpdateInfo> CheckForUpdate() {
         }
       }
     }
-    info.available = true;
-    info.version = tag;
-    info.notes = notes;
-    info.downloadUrl = downloadUrl;
-    info.pageUrl = page;
+    out.available = true;
+    out.version = tag;
+    out.notes = notes;
+    out.downloadUrl = downloadUrl;
+    out.pageUrl = page;
   } catch (...) {
     // Network/parse failures are non-fatal: report no update.
   }
-  co_return info;
+  co_return out.available;
 }
 
 } // namespace updates

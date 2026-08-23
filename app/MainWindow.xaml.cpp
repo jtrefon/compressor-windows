@@ -180,7 +180,8 @@ void MainWindow::OnCheckUpdatesClick(IInspectable const &,
 }
 
 winrt::Windows::Foundation::IAsyncAction MainWindow::CheckForUpdatesAsync(bool showWhenCurrent) {
-  const auto info = co_await updates::CheckForUpdate();
+  updates::UpdateInfo info;
+  const bool available = co_await updates::CheckForUpdate(info);
   winrt::Microsoft::UI::Xaml::Controls::ContentDialog dialog;
   dialog.XamlRoot(Content().XamlRoot());
   if (info.available) {

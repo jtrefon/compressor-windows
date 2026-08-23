@@ -29,8 +29,9 @@ struct UpdateInfo {
 // strictly newer than current.
 bool IsNewerVersion(const std::wstring &current, const std::wstring &candidate);
 
-// Queries the GitHub Releases API for the latest release. Never throws on
-// network/parse failures - returns available=false instead.
-winrt::Windows::Foundation::IAsyncOperation<UpdateInfo> CheckForUpdate();
+// Queries the GitHub Releases API for the latest release; fills @p out when a
+// newer release exists. Never throws on network/parse failures - returns
+// false instead.
+winrt::Windows::Foundation::IAsyncOperation<bool> CheckForUpdate(UpdateInfo &out);
 
 } // namespace updates
