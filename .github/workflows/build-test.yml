@@ -52,12 +52,16 @@ jobs:
       shell: pwsh
       run: |
         $exe = "app\x64\Release\CompressorWindows\CompressorWindows.exe"
-        $bytes = New-Object byte[] 80000
-        (New-Object System.Random(99)).NextBytes($bytes)
+        $text = [System.Text.Encoding]::UTF8.GetBytes(("the quick brown fox jumps over the lazy dog 0123456789\n" * 1500))
+        $rand = New-Object byte[] 20000
+        (New-Object System.Random(99)).NextBytes($rand)
+        $bytes = $text + $rand
         [System.IO.File]::WriteAllBytes("ui_in.bin", $bytes)
         $p = Start-Process -FilePath $exe -ArgumentList "--uitest","compress","--in","ui_in.bin","--out","ui_out.cpz","--result","ui_compress.result","--codec","ans" -Wait -PassThru -NoNewWindow
         $r = Get-Content "ui_compress.result" -ErrorAction Stop
         if (-not $r.StartsWith("OK")) { throw "UI compress failed: $r" }
+        $outLen = (Get-Item "ui_out.cpz").Length
+        if ($outLen -ge $bytes.Length) { throw "UI compression did not shrink input ($outLen >= $($bytes.Length))" }
         $p = Start-Process -FilePath $exe -ArgumentList "--uitest","decompress","--in","ui_out.cpz","--out","ui_back.bin","--result","ui_decompress.result" -Wait -PassThru -NoNewWindow
         $r = Get-Content "ui_decompress.result" -ErrorAction Stop
         if (-not $r.StartsWith("OK")) { throw "UI decompress failed: $r" }

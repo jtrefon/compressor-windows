@@ -80,12 +80,16 @@ jobs:
         if ($p.HasExited) { throw "installed app exited immediately (runtime missing?)" }
         Stop-Process -Id $p.Id -Force
         Start-Sleep -Seconds 1
-        $bytes = New-Object byte[] 60000
-        (New-Object System.Random(11)).NextBytes($bytes)
+        $text = [System.Text.Encoding]::UTF8.GetBytes(("the quick brown fox jumps over the lazy dog 0123456789\n" * 1200))
+        $rand = New-Object byte[] 12000
+        (New-Object System.Random(11)).NextBytes($rand)
+        $bytes = $text + $rand
         [System.IO.File]::WriteAllBytes("ui_inst_in.bin", $bytes)
         $q = Start-Process -FilePath "$inst\CompressorWindows.exe" -ArgumentList "--uitest","compress","--in","ui_inst_in.bin","--out","ui_inst_out.cpz","--result","ui_inst_compress.result","--codec","bwt2" -Wait -PassThru -NoNewWindow
         $r = Get-Content "ui_inst_compress.result" -ErrorAction Stop
         if (-not $r.StartsWith("OK")) { throw "installed UI compress failed: $r" }
+        $outLen = (Get-Item "ui_inst_out.cpz").Length
+        if ($outLen -ge $bytes.Length) { throw "installed UI compression did not shrink input ($outLen >= $($bytes.Length))" }
         $q = Start-Process -FilePath "$inst\CompressorWindows.exe" -ArgumentList "--uitest","decompress","--in","ui_inst_out.cpz","--out","ui_inst_back.bin","--result","ui_inst_decompress.result" -Wait -PassThru -NoNewWindow
         $r = Get-Content "ui_inst_decompress.result" -ErrorAction Stop
         if (-not $r.StartsWith("OK")) { throw "installed UI decompress failed: $r" }
