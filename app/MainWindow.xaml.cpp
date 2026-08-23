@@ -5,7 +5,10 @@
 #include <compression/codec/CodecRegistry.hpp>
 
 #include <microsoft.ui.xaml.window.h>
-#include <winrt/Microsoft.Windows.Storage.Pickers.h>
+#include <winrt/Windows.Storage.Pickers.h>
+#include <windows.storage.pickers.interop.h>
+
+using namespace compression;
 
 #include <cstdint>
 #include <filesystem>
@@ -169,9 +172,10 @@ void MainWindow::Run(bool compress) {
 
 winrt::fire_and_forget MainWindow::OnBrowseInClick(IInspectable const &,
                                                    RoutedEventArgs const &) {
-  auto picker = winrt::Microsoft::Windows::Storage::Pickers::FileOpenPicker{};
+  auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker{};
   picker.FileTypeFilter().Append(L"*");
-  picker.InitializeWithWindow(WindowHandle(*this));
+  winrt::check_hresult(
+      picker.as<IFileOpenPickerInterop>()->Initialize(WindowHandle(*this)));
   auto file = co_await picker.PickSingleFileAsync();
   if (file) {
     InputPath().Text(file.Path());
@@ -180,11 +184,12 @@ winrt::fire_and_forget MainWindow::OnBrowseInClick(IInspectable const &,
 
 winrt::fire_and_forget MainWindow::OnBrowseOutClick(IInspectable const &,
                                                     RoutedEventArgs const &) {
-  auto picker = winrt::Microsoft::Windows::Storage::Pickers::FileSavePicker{};
+  auto picker = winrt::Windows::Storage::Pickers::FileSavePicker{};
   picker.FileTypeChoices().Insert(L"Compressed files",
                                   winrt::single_threaded_vector<hstring>({L"*"}));
   picker.SuggestedFileName(L"output");
-  picker.InitializeWithWindow(WindowHandle(*this));
+  winrt::check_hresult(
+      picker.as<IFileSavePickerInterop>()->Initialize(WindowHandle(*this)));
   auto file = co_await picker.PickSaveFileAsync();
   if (file) {
     OutputPath().Text(file.Path());
@@ -193,10 +198,11 @@ winrt::fire_and_forget MainWindow::OnBrowseOutClick(IInspectable const &,
 
 winrt::fire_and_forget MainWindow::OnBrowseArchiveClick(IInspectable const &,
                                                         RoutedEventArgs const &) {
-  auto picker = winrt::Microsoft::Windows::Storage::Pickers::FileOpenPicker{};
+  auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker{};
   picker.FileTypeFilter().Append(L".cza");
   picker.FileTypeFilter().Append(L"*");
-  picker.InitializeWithWindow(WindowHandle(*this));
+  winrt::check_hresult(
+      picker.as<IFileOpenPickerInterop>()->Initialize(WindowHandle(*this)));
   auto file = co_await picker.PickSingleFileAsync();
   if (file) {
     ArchivePath().Text(file.Path());
@@ -205,9 +211,10 @@ winrt::fire_and_forget MainWindow::OnBrowseArchiveClick(IInspectable const &,
 
 winrt::fire_and_forget MainWindow::OnCreateArchiveClick(IInspectable const &,
                                                         RoutedEventArgs const &) {
-  auto picker = winrt::Microsoft::Windows::Storage::Pickers::FileOpenPicker{};
+  auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker{};
   picker.FileTypeFilter().Append(L"*");
-  picker.InitializeWithWindow(WindowHandle(*this));
+  winrt::check_hresult(
+      picker.as<IFileOpenPickerInterop>()->Initialize(WindowHandle(*this)));
   auto files = co_await picker.PickMultipleFilesAsync();
   if (files && files.Size() > 0) {
     std::vector<std::wstring> paths;
@@ -240,9 +247,10 @@ winrt::fire_and_forget MainWindow::OnExtractArchiveClick(IInspectable const &,
     SetArchiveStatus(L"Open an archive with entries first.");
     co_return;
   }
-  auto picker = winrt::Microsoft::Windows::Storage::Pickers::FolderPicker{};
+  auto picker = winrt::Windows::Storage::Pickers::FolderPicker{};
   picker.FileTypeFilter().Append(L"*");
-  picker.InitializeWithWindow(WindowHandle(*this));
+  winrt::check_hresult(
+      picker.as<IFolderPickerInterop>()->Initialize(WindowHandle(*this)));
   auto folder = co_await picker.PickSingleFolderAsync();
   if (folder) {
     const int32_t index = static_cast<int32_t>(ArchiveEntries().SelectedIndex());

@@ -20,6 +20,8 @@ using namespace Microsoft::UI::Xaml;
 
 namespace {
 
+using namespace compression;
+
 // Headless automation mode for the real executable (used by CI end-to-end
 // tests): CompressorWindows.exe compress <in> <out> [codec]
 //                              decompress <in> <out>
