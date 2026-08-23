@@ -283,7 +283,8 @@ int RunUiTest(const std::vector<std::wstring> &args) {
     winrt::Microsoft::UI::Xaml::Application::Current().Exit();
     return 1;
   }
-  const bool outputExists = std::filesystem::exists(std::filesystem::path(outPath));
+  const bool outputExists = std::filesystem::exists(std::filesystem::path(
+      op == L"archive-create" ? inPath : outPath));
   const bool success = ok && outputExists;
   wprintf(L"ui status: %ls\n", status.c_str());
   fflush(stdout);
