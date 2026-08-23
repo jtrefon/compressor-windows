@@ -30,6 +30,7 @@
     <UseWinUI>true</UseWinUI>
     <XamlLanguage>CppWinRT</XamlLanguage>
     <CppWinRTEnableComponentProjection>true</CppWinRTEnableComponentProjection>
+    <CppWinRTGenerateWindowsMetadata>true</CppWinRTGenerateWindowsMetadata>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <ItemGroup Label="ProjectConfigurations">
