@@ -10,15 +10,22 @@ framework — pure Windows App SDK (Fluent native look).
 
 ## Features
 
-- Compress / decompress any file with the strategy of your choice (list
-  generated from `CodecRegistry`), with real per-chunk progress and CRC
-  verification surfaced in the UI
-- Native file pickers (open / save), archive picker and folder picker
+- Compress / decompress any file with the strategy and thread count of your
+  choice (strategy list generated from `CodecRegistry`)
+- **Live progress**: progress bar plus a live status line showing percent,
+  bytes in/out and the running compression ratio; CRC verification surfaced
+  in the UI; **Cancel** aborts the operation and removes the partial output
+- **Drag & drop**: drop files anywhere on the window to load them; drop
+  multiple files to bundle them into an archive
+- Native file pickers (open / save with `.cpz` default), archive picker and
+  folder picker
 - `.cza` archives: create from multiple files, open & verify every block,
   list entries, extract a selected entry (path-traversal safe)
+- **File association**: the installer registers `.cpz`; double-clicking an
+  archive opens the app with it loaded, ready to decompress
 - Unpackaged + self-contained (`WindowsAppSDKSelfContained=true`): standalone
   executable, no runtime install required
-- App icon, per-monitor DPI aware
+- App icon, per-monitor DPI aware, Fluent theme (system dark/light)
 
 ### Updates
 
