@@ -323,7 +323,8 @@ void App::OnLaunched(LaunchActivatedEventArgs const &) {
     ExitProcess(static_cast<UINT>(RunUiTest(args)));
   }
   if (argv != nullptr && argc > 1 &&
-      (wcscmp(argv[1], L"compress") == 0 ||
+      (wcscmp(argv[1], L"--version") == 0 ||
+       wcscmp(argv[1], L"compress") == 0 ||
        wcscmp(argv[1], L"decompress") == 0 ||
        wcscmp(argv[1], L"archive") == 0)) {
     std::vector<std::wstring> args;

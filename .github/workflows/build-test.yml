@@ -78,7 +78,8 @@ jobs:
       shell: pwsh
       run: |
         $exe = "app\x64\Release\CompressorWindows\CompressorWindows.exe"
-        $p = Start-Process -FilePath $exe -ArgumentList @("--version") -Wait -PassThru -NoNewWindow -RedirectStandardOutput "ver_out.txt"
+        $p = Start-Process -FilePath $exe -ArgumentList @("--version") -PassThru -NoNewWindow -RedirectStandardOutput "ver_out.txt"
+        if (-not $p.WaitForExit(30000)) { Stop-Process -Id $p.Id -Force; throw "--version timed out" }
         if ($p.ExitCode -ne 0) { throw "--version failed: $($p.ExitCode)" }
         $v = (Get-Content "ver_out.txt" -ErrorAction Stop).Trim()
         if ($v -notmatch "^v?\d+\.\d+\.\d+$") { throw "--version output invalid: [$v]" }
