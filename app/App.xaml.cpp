@@ -143,13 +143,32 @@ int RunUiTest(const std::vector<std::wstring> &args) {
     return 2;
   }
 
-  // Spawn the real UI.
-  winrt::Microsoft::UI::Xaml::Window window =
-      winrt::make<CompressorWindows::implementation::MainWindow>();
-  window.Activate();
-  auto ui = window.as<CompressorWindows::implementation::MainWindow>();
+  // Spawn the real UI. Any failure must be reported via the result file and
+  // shut down gracefully - an unhandled exception would pop a WER dialog and
+  // hang CI.
+  winrt::Microsoft::UI::Xaml::Window window{nullptr};
+  winrt::CompressorWindows::implementation::MainWindow *ui = nullptr;
+  try {
+    window =
+        winrt::make<CompressorWindows::implementation::MainWindow>();
+    window.Activate();
+    ui = window.as<winrt::CompressorWindows::implementation::MainWindow>().get();
+  } catch (const std::exception &e) {
+    fprintf(stderr, "uitest setup failed: %s\n", e.what());
+    FILE *f = nullptr;
+    if (_wfopen_s(&f, resultPath.c_str(), L"w") == 0 && f != nullptr) {
+      fprintf(f, "FAIL setup: %s\n", e.what());
+      fclose(f);
+    }
+    if (window) {
+      window.Close();
+    }
+    winrt::Microsoft::UI::Xaml::Application::Current().Exit();
+    return 1;
+  }
 
   // Drive the real controls and trigger the real handlers.
+  try {
   if (isCompressOp) {
     ui->InputPath().Text(winrt::hstring{inPath});
     ui->OutputPath().Text(winrt::hstring{outPath});
@@ -238,6 +257,17 @@ int RunUiTest(const std::vector<std::wstring> &args) {
       break;
     }
     Sleep(50);
+  }
+  } catch (const std::exception &e) {
+    fprintf(stderr, "uitest workflow failed: %s\n", e.what());
+    FILE *f = nullptr;
+    if (_wfopen_s(&f, resultPath.c_str(), L"w") == 0 && f != nullptr) {
+      fprintf(f, "FAIL workflow: %s\n", e.what());
+      fclose(f);
+    }
+    window.Close();
+    winrt::Microsoft::UI::Xaml::Application::Current().Exit();
+    return 1;
   }
   const bool outputExists = std::filesystem::exists(std::filesystem::path(outPath));
   const bool success = ok && outputExists;
