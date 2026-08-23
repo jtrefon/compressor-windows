@@ -167,6 +167,8 @@ int RunUiTest(const std::vector<std::wstring> &args) {
     return 1;
   }
 
+  std::wstring status;
+  bool ok = false;
   // Drive the real controls and trigger the real handlers.
   try {
   if (isCompressOp) {
@@ -230,8 +232,6 @@ int RunUiTest(const std::vector<std::wstring> &args) {
   MSG msg{};
   const auto deadline =
       std::chrono::steady_clock::now() + std::chrono::seconds(30);
-  std::wstring status;
-  bool ok = false;
   for (;;) {
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
       TranslateMessage(&msg);
