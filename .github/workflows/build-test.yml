@@ -26,6 +26,11 @@ jobs:
     - name: Build engine, contract test and WinUI app
       run: cmake --build build --config Release --target winui_app contract_test -j2
 
+    - name: Print generated XAML header (debug)
+      if: failure()
+      shell: pwsh
+      run: Get-Content "app\Generated Files\MainWindow.xaml.g.h" -ErrorAction SilentlyContinue | Select-Object -First 45
+
     - name: Run contract tests (anti-corruption gate)
       working-directory: build
       run: ctest -C Release --output-on-failure
