@@ -20,13 +20,6 @@ jobs:
         curl -sL -o nuget.exe https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
         .\nuget.exe restore app\packages.config -PackagesDirectory app\packages
 
-    - name: Locate picker interop header (debug)
-      shell: pwsh
-      run: |
-        Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" -Directory | Select-Object -ExpandProperty FullName
-        Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\Include" -Recurse -Filter "windows.storage.pickers.interop.h" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-        $cmakeCache = Get-Content build\CMakeCache.txt -ErrorAction SilentlyContinue | Select-String "SDK_WINRT"
-        $cmakeCache
 
     - name: Configure (engine + contract test; MSBuild drives the WinUI app)
       run: cmake -S . -B build -A x64

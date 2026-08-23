@@ -5,8 +5,7 @@
 #include <compression/codec/CodecRegistry.hpp>
 
 #include <microsoft.ui.xaml.window.h>
-#include <winrt/Windows.Storage.Pickers.h>
-#include <windows.storage.pickers.interop.h>
+#include <shobjidl.h>
 
 using namespace compression;
 
@@ -51,6 +50,59 @@ HWND WindowHandle(winrt::Microsoft::UI::Xaml::Window const &window) {
 
 std::wstring Widen(const std::string &s) {
   return std::wstring(s.begin(), s.end());
+}
+
+std::wstring ShellItemPath(IShellItem *item) {
+  PWSTR raw = nullptr;
+  winrt::check_hresult(item->GetDisplayName(SIGDN_FILESYSPATH, &raw));
+  std::wstring result(raw ? raw : L"");
+  CoTaskMemFree(raw);
+  return result;
+}
+
+// Native file/folder dialogs (stable Win32 API; identical to the WinRT
+// pickers under the hood).
+std::vector<std::wstring> PickFiles(HWND hwnd, bool folders, bool multi) {
+  winrt::com_ptr<IFileOpenDialog> dlg;
+  winrt::check_hresult(CoCreateInstance(CLSID_FileOpenDialog, nullptr,
+                                        CLSCTX_INPROC_SERVER,
+                                        IID_PPV_ARGS(dlg.put())));
+  DWORD opts = FOS_FORCEFILESYSTEM;
+  if (folders) {
+    opts |= FOS_PICKFOLDERS;
+  }
+  if (multi) {
+    opts |= FOS_ALLOWMULTISELECT;
+  }
+  winrt::check_hresult(dlg->SetOptions(opts));
+  std::vector<std::wstring> result;
+  if (FAILED(dlg->Show(hwnd))) {
+    return result;
+  }
+  winrt::com_ptr<IShellItemArray> items;
+  winrt::check_hresult(dlg->GetResults(items.put()));
+  DWORD count = 0;
+  winrt::check_hresult(items->GetCount(&count));
+  for (DWORD i = 0; i < count; ++i) {
+    winrt::com_ptr<IShellItem> item;
+    winrt::check_hresult(items->GetItemAt(i, item.put()));
+    result.push_back(ShellItemPath(item.get()));
+  }
+  return result;
+}
+
+std::wstring PickSaveFile(HWND hwnd) {
+  winrt::com_ptr<IFileSaveDialog> dlg;
+  winrt::check_hresult(CoCreateInstance(CLSID_FileSaveDialog, nullptr,
+                                        CLSCTX_INPROC_SERVER,
+                                        IID_PPV_ARGS(dlg.put())));
+  winrt::check_hresult(dlg->SetOptions(FOS_FORCEFILESYSTEM));
+  if (FAILED(dlg->Show(hwnd))) {
+    return L"";
+  }
+  winrt::com_ptr<IShellItem> item;
+  winrt::check_hresult(dlg->GetResult(item.put()));
+  return ShellItemPath(item.get());
 }
 
 } // namespace
@@ -168,94 +220,67 @@ void MainWindow::Run(bool compress) {
   }).detach();
 }
 
-// --- File pickers (unpackaged WinUI 3: InitializeWithWindow is required) ---
+// --- File pickers (native IFileDialog; no WinRT picker projection needed) ---
 
-winrt::fire_and_forget MainWindow::OnBrowseInClick(IInspectable const &,
-                                                   RoutedEventArgs const &) {
-  auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker{};
-  picker.FileTypeFilter().Append(L"*");
-  winrt::check_hresult(
-      picker.as<IFileOpenPickerInterop>()->Initialize(WindowHandle(*this)));
-  auto file = co_await picker.PickSingleFileAsync();
-  if (file) {
-    InputPath().Text(file.Path());
+void MainWindow::OnBrowseInClick(IInspectable const &, RoutedEventArgs const &) {
+  const auto files = PickFiles(WindowHandle(*this), false, false);
+  if (!files.empty()) {
+    InputPath().Text(winrt::hstring{files[0]});
   }
 }
 
-winrt::fire_and_forget MainWindow::OnBrowseOutClick(IInspectable const &,
-                                                    RoutedEventArgs const &) {
-  auto picker = winrt::Windows::Storage::Pickers::FileSavePicker{};
-  picker.FileTypeChoices().Insert(L"Compressed files",
-                                  winrt::single_threaded_vector<hstring>({L"*"}));
-  picker.SuggestedFileName(L"output");
-  winrt::check_hresult(
-      picker.as<IFileSavePickerInterop>()->Initialize(WindowHandle(*this)));
-  auto file = co_await picker.PickSaveFileAsync();
-  if (file) {
-    OutputPath().Text(file.Path());
+void MainWindow::OnBrowseOutClick(IInspectable const &, RoutedEventArgs const &) {
+  const std::wstring path = PickSaveFile(WindowHandle(*this));
+  if (!path.empty()) {
+    OutputPath().Text(winrt::hstring{path});
   }
 }
 
-winrt::fire_and_forget MainWindow::OnBrowseArchiveClick(IInspectable const &,
-                                                        RoutedEventArgs const &) {
-  auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker{};
-  picker.FileTypeFilter().Append(L".cza");
-  picker.FileTypeFilter().Append(L"*");
-  winrt::check_hresult(
-      picker.as<IFileOpenPickerInterop>()->Initialize(WindowHandle(*this)));
-  auto file = co_await picker.PickSingleFileAsync();
-  if (file) {
-    ArchivePath().Text(file.Path());
+void MainWindow::OnBrowseArchiveClick(IInspectable const &,
+                                      RoutedEventArgs const &) {
+  const auto files = PickFiles(WindowHandle(*this), false, false);
+  if (!files.empty()) {
+    ArchivePath().Text(winrt::hstring{files[0]});
   }
 }
 
-winrt::fire_and_forget MainWindow::OnCreateArchiveClick(IInspectable const &,
-                                                        RoutedEventArgs const &) {
-  auto picker = winrt::Windows::Storage::Pickers::FileOpenPicker{};
-  picker.FileTypeFilter().Append(L"*");
-  winrt::check_hresult(
-      picker.as<IFileOpenPickerInterop>()->Initialize(WindowHandle(*this)));
-  auto files = co_await picker.PickMultipleFilesAsync();
-  if (files && files.Size() > 0) {
-    std::vector<std::wstring> paths;
-    for (const auto &f : files) {
-      paths.push_back(std::wstring(f.Path()));
-    }
-    const std::wstring outPath(ArchivePath().Text());
-    if (outPath.empty()) {
-      SetArchiveStatus(L"Choose an archive file first.");
-      co_return;
-    }
-    DoArchiveCreate(outPath, paths);
+void MainWindow::OnCreateArchiveClick(IInspectable const &,
+                                      RoutedEventArgs const &) {
+  const auto paths = PickFiles(WindowHandle(*this), false, true);
+  if (paths.empty()) {
+    return;
   }
+  const std::wstring outPath(ArchivePath().Text());
+  if (outPath.empty()) {
+    SetArchiveStatus(L"Choose an archive file first.");
+    return;
+  }
+  DoArchiveCreate(outPath, paths);
 }
 
-winrt::fire_and_forget MainWindow::OnOpenArchiveClick(IInspectable const &,
-                                                      RoutedEventArgs const &) {
+void MainWindow::OnOpenArchiveClick(IInspectable const &,
+                                    RoutedEventArgs const &) {
   const std::wstring archivePath(ArchivePath().Text());
   if (archivePath.empty()) {
     SetArchiveStatus(L"Choose an archive file first.");
-    co_return;
+    return;
   }
   DoArchiveOpen(archivePath);
 }
 
-winrt::fire_and_forget MainWindow::OnExtractArchiveClick(IInspectable const &,
-                                                         RoutedEventArgs const &) {
+void MainWindow::OnExtractArchiveClick(IInspectable const &,
+                                       RoutedEventArgs const &) {
   const std::wstring archivePath(ArchivePath().Text());
   if (archivePath.empty() || entries_.empty()) {
     SetArchiveStatus(L"Open an archive with entries first.");
-    co_return;
+    return;
   }
-  auto picker = winrt::Windows::Storage::Pickers::FolderPicker{};
-  picker.FileTypeFilter().Append(L"*");
-  winrt::check_hresult(
-      picker.as<IFolderPickerInterop>()->Initialize(WindowHandle(*this)));
-  auto folder = co_await picker.PickSingleFolderAsync();
-  if (folder) {
-    const int32_t index = static_cast<int32_t>(ArchiveEntries().SelectedIndex());
-    DoArchiveExtract(archivePath, index, std::wstring(folder.Path()));
+  const auto folders = PickFiles(WindowHandle(*this), true, false);
+  if (folders.empty()) {
+    return;
   }
+  const int32_t index = static_cast<int32_t>(ArchiveEntries().SelectedIndex());
+  DoArchiveExtract(archivePath, index, folders[0]);
 }
 
 // --- Archive operations (also used by the --uitest harness) ---
