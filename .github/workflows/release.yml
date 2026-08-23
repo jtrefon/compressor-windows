@@ -16,6 +16,11 @@ jobs:
     - name: Install UWP C++ tools (XAML compiler needs the UWP toolset)
       run: '& "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\18\Enterprise" --add Microsoft.VisualStudio.ComponentGroup.UWP.VC --quiet --wait --norestart'
 
+    - name: Restore NuGet packages (packages.config)
+      run: |
+        curl -sL -o nuget.exe https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
+        .\nuget.exe restore app\packages.config -PackagesDirectory app\packages
+
     - name: Configure
       run: cmake -S . -B build -A x64
 
