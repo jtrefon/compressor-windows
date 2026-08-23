@@ -52,9 +52,9 @@ winrt::Windows::Foundation::IAsyncOperation<UpdateInfo> CheckForUpdate() {
     }
     const auto body = co_await response.Content().ReadAsStringAsync();
     const auto root = winrt::Windows::Data::Json::JsonObject::Parse(body);
-    const std::wstring tag = root.GetNamedString(L"tag_name", L"");
-    const std::wstring page = root.GetNamedString(L"html_url", L"");
-    const std::wstring notes = root.GetNamedString(L"body", L"");
+    const std::wstring tag(root.GetNamedString(L"tag_name", L""));
+    const std::wstring page(root.GetNamedString(L"html_url", L""));
+    const std::wstring notes(root.GetNamedString(L"body", L""));
     if (tag.empty() || !IsNewerVersion(kAppVersion, tag)) {
       co_return info;
     }
@@ -63,9 +63,9 @@ winrt::Windows::Foundation::IAsyncOperation<UpdateInfo> CheckForUpdate() {
       const auto assets = root.GetNamedArray(L"assets");
       for (const auto &asset : assets) {
         const auto obj = asset.GetObject();
-        const std::wstring name = obj.GetNamedString(L"name", L"");
+        const std::wstring name(obj.GetNamedString(L"name", L""));
         if (name.find(L"-setup.exe") != std::wstring::npos) {
-          downloadUrl = obj.GetNamedString(L"browser_download_url", L"");
+          downloadUrl = std::wstring(obj.GetNamedString(L"browser_download_url", L""));
           break;
         }
       }
