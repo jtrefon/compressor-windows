@@ -159,7 +159,7 @@ void MainWindow::OnDecompressClick(IInspectable const &, RoutedEventArgs const &
 void MainWindow::SetStatus(std::wstring text) {
   if (queue_) {
     queue_.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueueHandler{
-        [this, text = std::move(text)]() { StatusText().Text(to_hstring(text)); }});
+        [this, text = std::move(text)]() { StatusText().Text(winrt::hstring{text}); }});
   }
 }
 
@@ -331,7 +331,7 @@ bool MainWindow::DoArchiveOpen(const std::wstring &archivePath) {
       swprintf_s(buf, L"%ls  (%llu bytes)",
                  Widen(e.name).c_str(),
                  static_cast<unsigned long long>(e.rawSize));
-      ArchiveEntries().Items().Append(box_value(to_hstring(std::wstring(buf))));
+      ArchiveEntries().Items().Append(box_value(winrt::hstring{buf}));
     }
     const auto verifyResults = archive.verify(std::filesystem::path(archivePath));
     bool allOk = true;
