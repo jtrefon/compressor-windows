@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_AUTOMOC ON)
 
 # --- Engine dependency: exact tag pin (see docs/PORTING.md in the engine) ---
-set(COMPRESSIONLIB_TAG "v1.6.3" CACHE STRING
+set(COMPRESSIONLIB_TAG "v1.6.4" CACHE STRING
     "compressionlib engine tag to pin (exact tag, never a branch)")
 include(FetchContent)
 FetchContent_Declare(
