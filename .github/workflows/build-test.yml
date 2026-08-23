@@ -13,7 +13,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install UWP C++ tools (XAML compiler needs the UWP toolset)
-      run: "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\18\Enterprise" --add Microsoft.VisualStudio.ComponentGroup.UWP.VC --quiet --norestart
+      run: '"C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\18\Enterprise" --add Microsoft.VisualStudio.ComponentGroup.UWP.VC --quiet --norestart'
 
     - name: Configure (engine + contract test; MSBuild drives the WinUI app)
       run: cmake -S . -B build -A x64
