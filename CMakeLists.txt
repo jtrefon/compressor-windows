@@ -42,6 +42,7 @@ set(ENGINE_LIB_DIR ${CMAKE_BINARY_DIR}/Release)
 
 add_custom_target(winui_app
     COMMAND "${MSBUILD_EXE}" ${CMAKE_SOURCE_DIR}/app/CompressorWindows.vcxproj
+            /restore
             /p:Configuration=Release /p:Platform=x64
             /p:EngineIncludeDir=${ENGINE_INCLUDE_DIR}
             /p:EngineLibDir=${ENGINE_LIB_DIR}
