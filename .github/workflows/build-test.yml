@@ -55,10 +55,12 @@ jobs:
         $bytes = New-Object byte[] 80000
         (New-Object System.Random(99)).NextBytes($bytes)
         [System.IO.File]::WriteAllBytes("ui_in.bin", $bytes)
-        $p = Start-Process -FilePath $exe -ArgumentList "--uitest","compress","--in","ui_in.bin","--out","ui_out.cpz","--codec","ans" -Wait -PassThru -NoNewWindow
-        if ($p.ExitCode -ne 0) { throw "UI compress failed: $($p.ExitCode)" }
-        $p = Start-Process -FilePath $exe -ArgumentList "--uitest","decompress","--in","ui_out.cpz","--out","ui_back.bin" -Wait -PassThru -NoNewWindow
-        if ($p.ExitCode -ne 0) { throw "UI decompress failed: $($p.ExitCode)" }
+        $p = Start-Process -FilePath $exe -ArgumentList "--uitest","compress","--in","ui_in.bin","--out","ui_out.cpz","--result","ui_compress.result","--codec","ans" -Wait -PassThru -NoNewWindow
+        $r = Get-Content "ui_compress.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "UI compress failed: $r" }
+        $p = Start-Process -FilePath $exe -ArgumentList "--uitest","decompress","--in","ui_out.cpz","--out","ui_back.bin","--result","ui_decompress.result" -Wait -PassThru -NoNewWindow
+        $r = Get-Content "ui_decompress.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "UI decompress failed: $r" }
         $a = [System.IO.File]::ReadAllBytes("ui_in.bin")
         $b = [System.IO.File]::ReadAllBytes("ui_back.bin")
         if ($a.Length -ne $b.Length) { throw "UI test size mismatch" }

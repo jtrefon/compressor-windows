@@ -87,11 +87,12 @@ int RunUiTest(const std::vector<std::wstring> &args) {
   const std::wstring inPath = ArgValue(args, L"--in");
   const std::wstring outPath = ArgValue(args, L"--out");
   const std::wstring codecName = ArgValue(args, L"--codec");
+  const std::wstring resultPath = ArgValue(args, L"--result");
   if ((op != L"compress" && op != L"decompress") || inPath.empty() ||
-      outPath.empty()) {
+      outPath.empty() || resultPath.empty()) {
     fprintf(stderr,
             "usage: CompressorWindows --uitest <compress|decompress> "
-            "--in <path> --out <path> [--codec <name>]\n");
+            "--in <path> --out <path> --result <path> [--codec <name>]\n");
     return 2;
   }
 
@@ -153,19 +154,19 @@ int RunUiTest(const std::vector<std::wstring> &args) {
     Sleep(50);
   }
   const bool outputExists = std::filesystem::exists(std::filesystem::path(outPath));
+  const bool success = ok && outputExists;
   wprintf(L"ui status: %ls\n", status.c_str());
   fflush(stdout);
-  const int code = (!ok || !outputExists) ? 1 : 0;
-  if (code != 0) {
-    fprintf(stderr, "UI TEST FAILED (status='%ls', output=%s)\n",
-            status.c_str(), outputExists ? "yes" : "no");
-    fflush(stderr);
+  // Report via a result file: XAML teardown on hard-exit paths is unreliable,
+  // so the harness asserts on this file rather than the process exit code.
+  FILE *resultFile = nullptr;
+  if (_wfopen_s(&resultFile, resultPath.c_str(), L"w") == 0 && resultFile != nullptr) {
+    fprintf(resultFile, success ? "OK %ls\n" : "FAIL %ls\n", status.c_str());
+    fclose(resultFile);
   }
-  // Tear the XAML window down before exiting so the framework does not crash
-  // during process teardown.
   window.Close();
-  Sleep(500);
-  return code;
+  winrt::Microsoft::UI::Xaml::Application::Current().Exit();
+  return success ? 0 : 1;
 }
 
 } // namespace

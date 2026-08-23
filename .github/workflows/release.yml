@@ -83,10 +83,12 @@ jobs:
         $bytes = New-Object byte[] 60000
         (New-Object System.Random(11)).NextBytes($bytes)
         [System.IO.File]::WriteAllBytes("ui_inst_in.bin", $bytes)
-        $q = Start-Process -FilePath "$inst\CompressorWindows.exe" -ArgumentList "--uitest","compress","--in","ui_inst_in.bin","--out","ui_inst_out.cpz","--codec","bwt2" -Wait -PassThru -NoNewWindow
-        if ($q.ExitCode -ne 0) { throw "installed UI compress failed: $($q.ExitCode)" }
-        $q = Start-Process -FilePath "$inst\CompressorWindows.exe" -ArgumentList "--uitest","decompress","--in","ui_inst_out.cpz","--out","ui_inst_back.bin" -Wait -PassThru -NoNewWindow
-        if ($q.ExitCode -ne 0) { throw "installed UI decompress failed: $($q.ExitCode)" }
+        $q = Start-Process -FilePath "$inst\CompressorWindows.exe" -ArgumentList "--uitest","compress","--in","ui_inst_in.bin","--out","ui_inst_out.cpz","--result","ui_inst_compress.result","--codec","bwt2" -Wait -PassThru -NoNewWindow
+        $r = Get-Content "ui_inst_compress.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "installed UI compress failed: $r" }
+        $q = Start-Process -FilePath "$inst\CompressorWindows.exe" -ArgumentList "--uitest","decompress","--in","ui_inst_out.cpz","--out","ui_inst_back.bin","--result","ui_inst_decompress.result" -Wait -PassThru -NoNewWindow
+        $r = Get-Content "ui_inst_decompress.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "installed UI decompress failed: $r" }
         $a = [System.IO.File]::ReadAllBytes("ui_inst_in.bin")
         $b = [System.IO.File]::ReadAllBytes("ui_inst_back.bin")
         if ($a.Length -ne $b.Length) { throw "installed UI size mismatch" }
