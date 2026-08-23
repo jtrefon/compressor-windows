@@ -22,6 +22,8 @@
 #include <winrt/Windows.Web.Http.Headers.h>
 #include <winrt/Windows.Data.Json.h>
 #include <winrt/Windows.System.h>
+#include <winrt/Windows.ApplicationModel.DataTransfer.h>
+#include <winrt/Windows.Storage.h>
 
 // Projection of the project's own Project.idl (declares MainWindow_base,
 // consumed by the XAML-compiler generated MainWindow.xaml.g.h).
