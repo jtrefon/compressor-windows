@@ -97,7 +97,7 @@ int RunUiTest(const std::vector<std::wstring> &args) {
 
   // Spawn the real UI.
   winrt::Microsoft::UI::Xaml::Window window =
-      winrt::make<CompressorWindows::MainWindow>();
+      winrt::make<CompressorWindows::implementation::MainWindow>();
   window.Activate();
   auto ui = window.as<CompressorWindows::implementation::MainWindow>();
 
