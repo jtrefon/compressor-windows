@@ -38,8 +38,8 @@ jobs:
         Copy-Item app\x64\Release\CompressorWindows\CompressorWindows.exe dist\CompressorWindows\
         # Windows App SDK self-contained runtime + engine are copied by the
         # build; add the VC runtime so the exe runs on clean machines.
-        $vc = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\Enterprise\VC\Redist\MSVC\*\x64\Microsoft.VC143.CRT\*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($vc) { Copy-Item $vc.Directory.FullName\*.dll dist\CompressorWindows\ }
+        $vc = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\Enterprise\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT\*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($vc) { Copy-Item (Join-Path (Split-Path $vc.FullName) '*.dll') dist\CompressorWindows\ }
         if (-not (Test-Path dist\CompressorWindows\CompressorWindows.exe)) { throw "app exe missing" }
 
     - name: Package portable zip
