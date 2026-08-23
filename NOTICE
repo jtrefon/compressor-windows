@@ -1,0 +1,8 @@
+Compressor for Windows
+Copyright (c) 2026 Jacek Trefon (https://www.trefon.com)
+
+This product includes software developed by Jacek Trefon.
+
+Includes CompressionLib (https://github.com/jtrefon/compressionlib),
+Copyright (c) 2026 Jacek Trefon, Apache-2.0.
+Uses the Qt framework, LGPL-3.0 (https://www.qt.io).

@@ -23,7 +23,7 @@ Section "Install"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\CompressorWindows" "DisplayName" "Compressor for Windows"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\CompressorWindows" "DisplayVersion" "${VERSION}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\CompressorWindows" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\CompressorWindows" "Publisher" "jtrefon"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\CompressorWindows" "Publisher" "Jacek Trefon"
 SectionEnd
 
 Section "Uninstall"
