@@ -49,6 +49,7 @@ add_custom_target(winui_app
             /p:Configuration=Release /p:Platform=x64
             /p:EngineIncludeDir=${ENGINE_INCLUDE_DIR}
             "/p:EngineLibPath=$<TARGET_FILE:compression>"
+            "/p:EngineSdkWinRtDir=${SDK_WINRT_INCLUDE_DIR}"
             /m
     COMMENT "Building WinUI 3 app (CompressorWindows)"
     VERBATIM)

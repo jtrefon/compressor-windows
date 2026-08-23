@@ -75,7 +75,7 @@
       <!-- Engine include dir comes from CMake via /p:EngineIncludeDir=...
            $(GeneratedFilesDir) holds the XAML-compiler and C++/WinRT
            generated headers (module.g.cpp, *.xaml.g.h, winrt/). -->
-      <AdditionalIncludeDirectories>$(EngineIncludeDir);$(GeneratedFilesDir);$(IntDir);$(OutDir);$(ProjectDir);$(WindowsSdkDir)Include\$(WindowsSDKVersion)\winrt;$(WindowsSdkDir)Include\$(WindowsSDKVersion)\um;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(EngineIncludeDir);$(GeneratedFilesDir);$(IntDir);$(OutDir);$(ProjectDir);$(EngineSdkWinRtDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>$(EngineLibPath);%(AdditionalDependencies)</AdditionalDependencies>
