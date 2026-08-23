@@ -35,16 +35,29 @@ release cannot be tagged.
 
 ## End-to-end tests (CI)
 
-- **Executable round trip**: the app has a headless mode
-  (`CompressorWindows.exe compress <in> <out> [codec]` / `decompress <in> <out>`)
-  running the same facade the GUI uses. CI compresses and decompresses a
-  random 100 KB payload through the real executable and byte-compares the
-  result — on every build and again against the staged portable executable
-  in the release pipeline.
-- **Installer verification** (release pipeline): the NSIS installer is run
-  silently to a clean directory, the installed exe + uninstaller are checked,
-  the installed app is launched (must not crash), then uninstalled and the
-  install directory must be gone.
+Three test layers run against the **real executable**:
+
+1. **Headless round trip** — `CompressorWindows.exe compress <in> <out>
+   [codec]` / `decompress <in> <out>` runs the engine facade directly (no UI).
+   CI compresses and decompresses a random payload and byte-compares the
+   result — on every build and again against the staged portable executable
+   in the release pipeline.
+2. **UI integration (--uitest)** — the real window is spawned and activated
+   (XAML loads, controls instantiate, strategy combo populated from the
+   registry), then the real controls and click handlers are driven exactly as
+   a user would, with the XAML message loop pumping until the UI reports
+   completion:
+   `CompressorWindows.exe --uitest <compress|decompress> --in <path> --out
+   <path> --result <file> [--codec <name>]`
+   The result is written to `--result` ("OK ..." or "FAIL ...") since XAML
+   teardown makes process exit codes unreliable. CI runs a full
+   compress + decompress workflow through the live UI on every build, and
+   again against the **installed** executable after the installer runs.
+3. **Installer verification** (release pipeline): the NSIS installer is run
+   silently to a clean directory, the installed exe + uninstaller are checked,
+   the installed app is launched (must not crash), the `--uitest` workflow is
+   executed through the installed app, then it is uninstalled and the install
+   directory must be gone.
 
 ## Engine pin policy
 
