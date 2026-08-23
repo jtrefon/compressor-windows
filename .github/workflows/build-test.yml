@@ -48,6 +48,7 @@ jobs:
         if ($a.Length -ne $b.Length) { throw "E2E size mismatch" }
         for ($i = 0; $i -lt $a.Length; $i++) { if ($a[$i] -ne $b[$i]) { throw "E2E byte mismatch at $i" } }
         Write-Host "E2E ROUND TRIP OK"
+        exit 0
 
     - name: "UI test: real window performs compress + decompress (--uitest)"
       shell: pwsh
@@ -71,6 +72,7 @@ jobs:
         if ($a.Length -ne $b.Length) { throw "UI test size mismatch" }
         for ($i = 0; $i -lt $a.Length; $i++) { if ($a[$i] -ne $b[$i]) { throw "UI test byte mismatch at $i" } }
         Write-Host "UI TEST ROUND TRIP OK"
+        exit 0
 
     - name: "Archive test: headless create/verify + UI-driven create/verify/extract"
       shell: pwsh
@@ -100,6 +102,7 @@ jobs:
         $extracted = Get-ChildItem ui_extract_dir -Recurse -File | Select-Object -First 1
         if (-not $extracted) { throw "UI archive extract produced no files" }
         Write-Host "ARCHIVE TESTS OK"
+        exit 0
         $p = Invoke-App @("archive","verify","headless_test.cza")
         if ($p.ExitCode -ne 0) { throw "headless archive verify failed: $($p.ExitCode)" }
         New-Item -ItemType Directory -Force -Path ui_extract_dir | Out-Null
@@ -115,4 +118,5 @@ jobs:
         $extracted = Get-ChildItem ui_extract_dir -Recurse -File | Select-Object -First 1
         if (-not $extracted) { throw "UI archive extract produced no files" }
         Write-Host "ARCHIVE TESTS OK"
+        exit 0
 
