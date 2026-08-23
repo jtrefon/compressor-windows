@@ -18,16 +18,8 @@ jobs:
         python -m aqt install-qt windows desktop 6.7.2 win64_msvc2019_64 --outputdir "${{ runner.temp }}/Qt"
       shell: bash
 
-    - name: Locate Qt
-      id: qt
-      shell: pwsh
-      run: |
-        $cfg = Get-ChildItem -Path ${{ runner.temp }}/Qt -Recurse -Filter Qt6Config.cmake | Select-Object -First 1
-        if (-not $cfg) { throw "Qt6Config.cmake not found under ${{ runner.temp }}/Qt" }
-        "QT6_DIR=$($cfg.DirectoryName)" | Out-File -Append $env:GITHUB_ENV
-
     - name: Configure
-      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DQt6_DIR=$env:QT6_DIR
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${{ runner.temp }}/Qt/6.7.2/msvc2019_64"
       shell: pwsh
 
     - name: Build
