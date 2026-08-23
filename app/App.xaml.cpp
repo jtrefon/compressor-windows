@@ -5,9 +5,12 @@
 #include <compression/app/CompressionService.hpp>
 #include <compression/codec/CodecRegistry.hpp>
 
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <shellapi.h>
 #include <string>
+#include <thread>
 #include <vector>
 
 using namespace winrt;
@@ -65,6 +68,103 @@ int RunHeadless(const std::vector<std::wstring> &args) {
   return 2;
 }
 
+std::wstring ArgValue(const std::vector<std::wstring> &args, const wchar_t *key) {
+  for (std::size_t i = 0; i + 1 < args.size(); ++i) {
+    if (_wcsicmp(args[i].c_str(), key) == 0) {
+      return args[i + 1];
+    }
+  }
+  return L"";
+}
+
+// UI integration test: the REAL window is created and activated (XAML loads,
+// controls instantiate, the strategy combo is populated from the registry),
+// then the real controls and event handlers are driven exactly as a user
+// would, and the XAML message loop pumps until the UI reports completion.
+// Exit code signals success so CI can assert on it.
+int RunUiTest(const std::vector<std::wstring> &args) {
+  const std::wstring op = args.empty() ? L"" : args[0];
+  const std::wstring inPath = ArgValue(args, L"--in");
+  const std::wstring outPath = ArgValue(args, L"--out");
+  const std::wstring codecName = ArgValue(args, L"--codec");
+  if ((op != L"compress" && op != L"decompress") || inPath.empty() ||
+      outPath.empty()) {
+    fprintf(stderr,
+            "usage: CompressorWindows --uitest <compress|decompress> "
+            "--in <path> --out <path> [--codec <name>]\n");
+    return 2;
+  }
+
+  // Spawn the real UI.
+  winrt::Microsoft::UI::Xaml::Window window =
+      winrt::make<CompressorWindows::MainWindow>();
+  window.Activate();
+  auto ui = window.as<CompressorWindows::implementation::MainWindow>();
+
+  // Drive the real controls.
+  ui->InputPath().Text(winrt::hstring{inPath});
+  ui->OutputPath().Text(winrt::hstring{outPath});
+  if (op == L"compress" && !codecName.empty()) {
+    const auto items = ui->StrategyCombo().Items();
+    for (uint32_t i = 0; i < items.Size(); ++i) {
+      if (winrt::unbox_value_or<winrt::hstring>(items.GetAt(i), L"") ==
+          winrt::hstring{codecName}) {
+        ui->StrategyCombo().SelectedIndex(i);
+        break;
+      }
+    }
+  }
+
+  // Trigger the real click handler (background engine work + DispatcherQueue
+  // marshaling back to the UI thread).
+  if (op == L"compress") {
+    ui->OnCompressClick(winrt::box_value(L"uitest"),
+                        winrt::Microsoft::UI::Xaml::RoutedEventArgs{});
+  } else {
+    ui->OnDecompressClick(winrt::box_value(L"uitest"),
+                          winrt::Microsoft::UI::Xaml::RoutedEventArgs{});
+  }
+
+  // Pump the XAML message loop until the UI reports completion.
+  MSG msg{};
+  const auto deadline =
+      std::chrono::steady_clock::now() + std::chrono::seconds(30);
+  std::wstring status;
+  bool ok = false;
+  for (;;) {
+    while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
+    status = std::wstring(ui->StatusText().Text());
+    const bool finished =
+        status.find(L"Compressed") != std::wstring::npos ||
+        status.find(L"Decompressed") != std::wstring::npos ||
+        status.find(L"error") != std::wstring::npos ||
+        status.find(L"Error") != std::wstring::npos;
+    if (finished) {
+      ok = status.find(L"error") == std::wstring::npos &&
+           status.find(L"Error") == std::wstring::npos;
+      break;
+    }
+    if (std::chrono::steady_clock::now() > deadline) {
+      break;
+    }
+    Sleep(50);
+  }
+  const bool outputExists = std::filesystem::exists(std::filesystem::path(outPath));
+  wprintf(L"ui status: %ls\n", status.c_str());
+  fflush(stdout);
+  if (!ok || !outputExists) {
+    fprintf(stderr, "UI TEST FAILED (status='%ls', output=%s)\n",
+            status.c_str(), outputExists ? "yes" : "no");
+    return 1;
+  }
+  printf("UI TEST OK\n");
+  fflush(stdout);
+  return 0;
+}
+
 } // namespace
 
 namespace winrt::CompressorWindows::implementation {
@@ -73,6 +173,14 @@ App::App() { InitializeComponent(); }
 void App::OnLaunched(LaunchActivatedEventArgs const &) {
   int argc = 0;
   wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+  if (argv != nullptr && argc > 1 && wcscmp(argv[1], L"--uitest") == 0) {
+    std::vector<std::wstring> args;
+    for (int i = 2; i < argc; ++i) {
+      args.emplace_back(argv[i]);
+    }
+    LocalFree(argv);
+    ExitProcess(static_cast<UINT>(RunUiTest(args)));
+  }
   if (argv != nullptr && argc > 1 &&
       (wcscmp(argv[1], L"compress") == 0 ||
        wcscmp(argv[1], L"decompress") == 0)) {

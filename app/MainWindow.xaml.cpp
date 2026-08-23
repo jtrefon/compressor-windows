@@ -31,6 +31,13 @@ MainWindow::MainWindow() {
   if (StrategyCombo().Items().Size() > 0) {
     StrategyCombo().SelectedIndex(0);
   }
+  for (uint32_t i = 0; i < StrategyCombo().Items().Size(); ++i) {
+    if (winrt::unbox_value_or<winrt::hstring>(StrategyCombo().Items().GetAt(i), L"") ==
+        L"optimized") {
+      StrategyCombo().SelectedIndex(i);
+      break;
+    }
+  }
 
   queue_ = winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread();
 }

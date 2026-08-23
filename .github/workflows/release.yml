@@ -80,6 +80,18 @@ jobs:
         if ($p.HasExited) { throw "installed app exited immediately (runtime missing?)" }
         Stop-Process -Id $p.Id -Force
         Start-Sleep -Seconds 1
+        $bytes = New-Object byte[] 60000
+        (New-Object System.Random(11)).NextBytes($bytes)
+        [System.IO.File]::WriteAllBytes("ui_inst_in.bin", $bytes)
+        $q = Start-Process -FilePath "$inst\CompressorWindows.exe" -ArgumentList "--uitest","compress","--in","ui_inst_in.bin","--out","ui_inst_out.cpz","--codec","bwt2" -Wait -PassThru -NoNewWindow
+        if ($q.ExitCode -ne 0) { throw "installed UI compress failed: $($q.ExitCode)" }
+        $q = Start-Process -FilePath "$inst\CompressorWindows.exe" -ArgumentList "--uitest","decompress","--in","ui_inst_out.cpz","--out","ui_inst_back.bin" -Wait -PassThru -NoNewWindow
+        if ($q.ExitCode -ne 0) { throw "installed UI decompress failed: $($q.ExitCode)" }
+        $a = [System.IO.File]::ReadAllBytes("ui_inst_in.bin")
+        $b = [System.IO.File]::ReadAllBytes("ui_inst_back.bin")
+        if ($a.Length -ne $b.Length) { throw "installed UI size mismatch" }
+        for ($i = 0; $i -lt $a.Length; $i++) { if ($a[$i] -ne $b[$i]) { throw "installed UI byte mismatch at $i" } }
+        Write-Host "INSTALLED UI WORKFLOW OK"
         & "$inst\uninstall.exe" /S
         Start-Sleep -Seconds 3
         if (Test-Path "$inst") { throw "uninstaller did not remove the install directory" }
