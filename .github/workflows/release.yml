@@ -35,7 +35,7 @@ jobs:
     - name: Stage standalone app directory
       run: |
         New-Item -ItemType Directory -Force -Path dist\CompressorWindows | Out-Null
-        Copy-Item app\x64\Release\CompressorWindows.exe dist\CompressorWindows\
+        Copy-Item app\x64\Release\CompressorWindows\CompressorWindows.exe dist\CompressorWindows\
         # Windows App SDK self-contained runtime + engine are copied by the
         # build; add the VC runtime so the exe runs on clean machines.
         $vc = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\Enterprise\VC\Redist\MSVC\*\x64\Microsoft.VC143.CRT\*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
