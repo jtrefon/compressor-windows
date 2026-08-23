@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="CompressorWindows.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Compressor for Windows">
+
+    <StackPanel Spacing="8" Margin="24" MaxWidth="640" HorizontalAlignment="Left">
+        <TextBox x:Name="InputPath" Header="Input file" />
+        <TextBox x:Name="OutputPath" Header="Output file" />
+        <ComboBox x:Name="StrategyCombo" Header="Strategy" />
+        <ProgressBar x:Name="Progress" Minimum="0" Maximum="100" />
+        <TextBlock x:Name="StatusText" TextWrapping="Wrap" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button x:Name="CompressBtn" Content="Compress" Click="OnCompressClick" />
+            <Button x:Name="DecompressBtn" Content="Decompress" Click="OnDecompressClick" />
+        </StackPanel>
+    </StackPanel>
+</Window>

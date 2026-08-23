@@ -3,7 +3,6 @@ project(CompressorWindows VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-set(CMAKE_AUTOMOC ON)
 
 # --- Engine dependency: exact tag pin (see docs/PORTING.md in the engine) ---
 set(COMPRESSIONLIB_TAG "v1.6.4" CACHE STRING
@@ -16,32 +15,37 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(compressionlib)
 
-# --- Qt 6 (set CMAKE_PREFIX_PATH to the Qt installation) ---
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
-
-qt_standard_project_setup()
-
-add_executable(CompressorWindows
-    src/main.cpp
-)
-target_link_libraries(CompressorWindows PRIVATE
-    Qt6::Widgets
-    CompressionLib::compression
-)
-
-# --- Anti-corruption contract test (no Qt; runs headless in CI) ---
+# --- Anti-corruption contract test (headless, runs in CI) ---
 enable_testing()
 add_executable(contract_test tests/contract_test.cpp)
 target_link_libraries(contract_test PRIVATE CompressionLib::compression)
 add_test(NAME contract_test COMMAND contract_test)
 
-# --- Packaging ---
-include(GNUInstallDirs)
-install(TARGETS CompressorWindows
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
-set(CPACK_PACKAGE_NAME "CompressorWindows")
-set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-set(CPACK_GENERATOR "ZIP")
-set(CPACK_STRIP_FILES TRUE)
-include(CPack)
+# --- WinUI 3 (C++/WinRT) app, built by MSBuild (XAML compilation uses the
+#     Windows App SDK build targets; CMake drives it so the engine lib is
+#     always built first and paths stay in one place) ---
+find_program(VSWHERE_EXE vswhere
+    PATHS "C:/Program Files (x86)/Microsoft Visual Studio/Installer"
+    REQUIRED)
+execute_process(
+    COMMAND ${VSWHERE_EXE} -latest -products * -requires Microsoft.Component.MSBuild
+            -find "MSBuild/**/Bin/MSBuild.exe"
+    OUTPUT_VARIABLE MSBUILD_EXE
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(NOT MSBUILD_EXE)
+    message(FATAL_ERROR "MSBuild.exe not found via vswhere")
+endif()
+
+# Engine artifacts for the app target (multi-config VS generator layout).
+set(ENGINE_INCLUDE_DIR ${compressionlib_SOURCE_DIR}/include)
+set(ENGINE_LIB_DIR ${CMAKE_BINARY_DIR}/Release)
+
+add_custom_target(winui_app
+    COMMAND "${MSBUILD_EXE}" ${CMAKE_SOURCE_DIR}/app/CompressorWindows.vcxproj
+            /p:Configuration=Release /p:Platform=x64
+            /p:EngineIncludeDir=${ENGINE_INCLUDE_DIR}
+            /p:EngineLibDir=${ENGINE_LIB_DIR}
+            /m
+    COMMENT "Building WinUI 3 app (CompressorWindows)"
+    VERBATIM)
+add_dependencies(winui_app compression)

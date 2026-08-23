@@ -1,6 +1,6 @@
 ; CompressorWindows NSIS installer script
 ; Build: makensis /DVERSION=vX.Y.Z installer.nsi
-; Expects the staged portable tree in dist/CompressorWindows.
+; Expects the staged standalone tree in dist/CompressorWindows.
 
 Unicode true
 Name "Compressor for Windows"
