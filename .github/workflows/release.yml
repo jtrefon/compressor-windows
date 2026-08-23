@@ -28,7 +28,7 @@ jobs:
 
     - name: Run contract tests (do not release a broken build)
       working-directory: build
-      run: ctest --output-on-failure
+      run: ctest -C Release --output-on-failure
 
     # --- Packaging: standalone executable + portable zip + installer ---
     - name: Stage portable directory

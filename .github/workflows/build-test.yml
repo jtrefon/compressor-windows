@@ -27,7 +27,7 @@ jobs:
 
     - name: Run contract tests (anti-corruption gate)
       working-directory: build
-      run: ctest --output-on-failure
+      run: ctest -C Release --output-on-failure
 
     - name: Verify engine pin is an exact tag
       run: |
