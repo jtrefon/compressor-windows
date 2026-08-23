@@ -83,6 +83,10 @@ jobs:
         $exe = "app\x64\Release\CompressorWindows\CompressorWindows.exe"
         [System.IO.File]::WriteAllBytes("arch_a.bin", [System.Text.Encoding]::UTF8.GetBytes(("archive payload A alpha beta gamma\n" * 300)))
         [System.IO.File]::WriteAllBytes("arch_b.bin", [System.Text.Encoding]::UTF8.GetBytes(("archive payload B delta epsilon zeta\n" * 400)))
+        $p = Start-Process -FilePath $exe -ArgumentList @("archive","create") -PassThru -NoNewWindow -RedirectStandardOutput "dbg_out.txt" -RedirectStandardError "dbg_err.txt"
+        if (-not $p.WaitForExit(30000)) { Stop-Process -Id $p.Id -Force; throw "usage probe timed out" }
+        Write-Host "usage probe exit: $($p.ExitCode)"
+        Get-Content "dbg_out.txt","dbg_err.txt" -ErrorAction SilentlyContinue
         $p = Invoke-App @("archive","create","headless_test.cza","arch_a.bin","arch_b.bin")
         if ($p.ExitCode -ne 0) { throw "headless archive create failed: $($p.ExitCode)" }
         $p = Invoke-App @("archive","verify","headless_test.cza")
