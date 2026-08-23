@@ -38,7 +38,7 @@ endif()
 
 # Engine artifacts for the app target (multi-config VS generator layout).
 set(ENGINE_INCLUDE_DIR ${compressionlib_SOURCE_DIR}/include)
-set(ENGINE_LIB_DIR ${CMAKE_BINARY_DIR}/Release)
+set(ENGINE_LIB_DIR ${compressionlib_BINARY_DIR}/Release)
 
 add_custom_target(winui_app
     COMMAND "${MSBUILD_EXE}" ${CMAKE_SOURCE_DIR}/app/CompressorWindows.vcxproj
