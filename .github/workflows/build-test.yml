@@ -31,7 +31,7 @@ jobs:
       working-directory: build
       run: ctest -C Release --output-on-failure
 
-    - name: E2E: executable round trip (headless mode)
+    - name: "E2E: executable round trip (headless mode)"
       shell: pwsh
       run: |
         $exe = "app\x64\Release\CompressorWindows\CompressorWindows.exe"

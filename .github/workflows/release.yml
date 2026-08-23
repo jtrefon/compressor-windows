@@ -42,7 +42,7 @@ jobs:
         if ($vc) { Copy-Item (Join-Path (Split-Path $vc.FullName) '*.dll') dist\CompressorWindows\ }
         if (-not (Test-Path dist\CompressorWindows\CompressorWindows.exe)) { throw "app exe missing" }
 
-    - name: E2E: staged portable executable round trip (headless mode)
+    - name: "E2E: staged portable executable round trip (headless mode)"
       shell: pwsh
       run: |
         $exe = "dist\CompressorWindows\CompressorWindows.exe"
