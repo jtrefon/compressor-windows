@@ -78,8 +78,7 @@
       <AdditionalIncludeDirectories>$(EngineIncludeDir);$(GeneratedFilesDir);$(IntDir);$(OutDir);$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(EngineLibDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>compression.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(EngineLibPath);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">

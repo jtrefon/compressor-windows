@@ -45,7 +45,7 @@ add_custom_target(winui_app
             /restore
             /p:Configuration=Release /p:Platform=x64
             /p:EngineIncludeDir=${ENGINE_INCLUDE_DIR}
-            /p:EngineLibDir=${ENGINE_LIB_DIR}
+            /p:EngineLibPath=${ENGINE_LIB_DIR}/compression.lib
             /m
     COMMENT "Building WinUI 3 app (CompressorWindows)"
     VERBATIM)
