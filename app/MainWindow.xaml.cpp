@@ -380,7 +380,7 @@ bool MainWindow::DoArchiveExtract(const std::wstring &archivePath,
 } // namespace winrt::CompressorWindows::implementation
 // Factory hook expected by the C++/WinRT generated module.g.cpp (normally
 // emitted by the component projection, which does not run for this project).
-extern "C" void *__cdecl winrt_make_CompressorWindows_MainWindow(void) {
+void *__cdecl winrt_make_CompressorWindows_MainWindow(void) {
   return winrt::detach_abi(
       winrt::make<winrt::CompressorWindows::implementation::MainWindow>());
 }
