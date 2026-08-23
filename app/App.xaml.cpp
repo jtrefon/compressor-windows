@@ -284,7 +284,7 @@ int RunUiTest(const std::vector<std::wstring> &args) {
     return 1;
   }
   const bool outputExists = std::filesystem::exists(std::filesystem::path(
-      op == L"archive-create" ? inPath : outPath));
+      (op == L"archive-create" || op == L"archive-verify") ? inPath : outPath));
   const bool success = ok && outputExists;
   wprintf(L"ui status: %ls\n", status.c_str());
   fflush(stdout);
