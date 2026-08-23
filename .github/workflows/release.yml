@@ -1,0 +1,62 @@
+name: Release Compressor for Windows
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Qt (aqtinstall)
+      run: |
+        python -m pip install --quiet aqtinstall
+        python -m aqt install-qt windows desktop 6.7.2 win64_msvc2022_64 --outputdir ${{ runner.temp }}/Qt
+      shell: bash
+
+    - name: Configure
+      run: >
+        cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+        -DCMAKE_PREFIX_PATH=${{ runner.temp }}/Qt/6.7.2/msvc2022_64
+
+    - name: Build
+      run: cmake --build build --config Release -j2
+
+    - name: Run contract tests (do not release a broken build)
+      working-directory: build
+      run: ctest --output-on-failure
+
+    # --- Packaging: standalone executable + portable zip + installer ---
+    - name: Stage portable directory
+      run: |
+        cmake --install build --config Release --prefix dist/CompressorWindows
+        windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw dist/CompressorWindows/CompressorWindows.exe
+      shell: bash
+
+    - name: Package portable zip
+      run: Compress-Archive -Path dist/CompressorWindows -DestinationPath dist/CompressorWindows-${{ github.ref_name }}.zip
+
+    - name: Install NSIS
+      run: choco install nsis -y --no-progress
+
+    - name: Build installer
+      run: makensis /DVERSION=${{ github.ref_name }} installer.nsi
+
+    - name: Compute checksums
+      run: |
+        Get-FileHash -Algorithm SHA256 dist/CompressorWindows-${{ github.ref_name }}.zip | ForEach-Object { "$($_.Hash.ToLower())  $($_.Path.Split('\')[-1])" } | Out-File -Encoding ascii dist/SHA256SUMS.txt
+        Get-FileHash -Algorithm SHA256 CompressorWindows-${{ github.ref_name }}-setup.exe | ForEach-Object { "$($_.Hash.ToLower())  $($_.Path.Split('\')[-1])" } | Out-File -Append -Encoding ascii dist/SHA256SUMS.txt
+
+    - name: Publish release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          dist/CompressorWindows-${{ github.ref_name }}.zip
+          CompressorWindows-${{ github.ref_name }}-setup.exe
+          dist/SHA256SUMS.txt
+        generate_release_notes: true
