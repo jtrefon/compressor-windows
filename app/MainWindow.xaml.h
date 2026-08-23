@@ -25,3 +25,7 @@ private:
   std::vector<compression::format::AlgorithmID> strategyIds_;
 };
 } // namespace winrt::CompressorWindows::implementation
+
+namespace winrt::CompressorWindows::factory_implementation {
+struct MainWindow : MainWindowT<MainWindow, implementation::MainWindow> {};
+} // namespace winrt::CompressorWindows::factory_implementation

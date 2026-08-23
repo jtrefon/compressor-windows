@@ -47,7 +47,7 @@ void MainWindow::SetStatus(std::wstring text) {
   if (queue_) {
     queue_.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueueHandler{
         [this, text = std::move(text)]() {
-          StatusText().Text(to_hstring(text));
+          StatusText().Text(winrt::hstring{text});
         }});
   }
 }
