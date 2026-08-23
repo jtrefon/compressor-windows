@@ -45,18 +45,21 @@ int RunHeadless(const std::vector<std::wstring> &args) {
   try {
     compression::CompressionService service;
     if (args[0] == L"compress") {
-      if (args.size() < 3 || args.size() > 4) {
-        fprintf(stderr, "usage: compress <in> <out> [codec]\n");
+      if (args.size() < 3 || args.size() > 5) {
+        fprintf(stderr, "usage: compress <in> <out> [codec] [threads]\n");
         return 2;
       }
       compression::CompressionOptions options;
-      if (args.size() == 4) {
+      if (args.size() >= 4) {
         const std::string codecName(args[3].begin(), args[3].end());
         options.codec = compression::codec::CodecRegistry::instance().idOf(codecName);
         if (options.codec == compression::format::AlgorithmID::UNKNOWN) {
           fprintf(stderr, "unknown codec: %ls\n", args[3].c_str());
           return 2;
         }
+      }
+      if (args.size() == 5) {
+        options.threads = static_cast<std::size_t>(_wtoi(args[4].c_str()));
       }
       const auto r = service.compressFile(
           std::filesystem::path(args[1]), std::filesystem::path(args[2]), options);
@@ -335,6 +338,15 @@ void App::OnLaunched(LaunchActivatedEventArgs const &) {
     ExitProcess(static_cast<UINT>(RunHeadless(args)));
   }
   if (argv != nullptr) {
+    for (int i = 1; i < argc; ++i) {
+      if (argv[i][0] != L'-') {
+        // First non-flag argument: a file to open (file association /
+        // double-click on a .cpz archive).
+        window.as<CompressorWindows::implementation::MainWindow>()
+            ->PrefillInput(argv[i]);
+        break;
+      }
+    }
     LocalFree(argv);
   }
   window = make<MainWindow>();

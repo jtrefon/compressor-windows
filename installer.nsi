@@ -33,4 +33,6 @@ Section "Uninstall"
   RMDir "$SMPROGRAMS\CompressorWindows"
   Delete "$DESKTOP\Compressor for Windows.lnk"
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\CompressorWindows"
+  DeleteRegKey HKLM "Software\Classes\CompressorWindows.cpz"
+  DeleteRegKey HKLM "Software\Classes\.cpz"
 SectionEnd

@@ -6,7 +6,8 @@
     Title="Compressor for Windows">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="8" Margin="24" MaxWidth="720" HorizontalAlignment="Left">
+        <StackPanel Spacing="8" Margin="24" MaxWidth="720" HorizontalAlignment="Left"
+                    AllowDrop="True" DragOver="OnDragOver" Drop="OnDrop">
 
             <TextBlock Text="Compress / Decompress" FontWeight="SemiBold" />
             <TextBox x:Name="InputPath" Header="Input file" />
@@ -15,13 +16,19 @@
                 <Button x:Name="BrowseInBtn" Content="Browse input..." Click="OnBrowseInClick" />
                 <Button x:Name="BrowseOutBtn" Content="Browse output..." Click="OnBrowseOutClick" />
             </StackPanel>
-            <ComboBox x:Name="StrategyCombo" Header="Strategy" />
+            <StackPanel Orientation="Horizontal" Spacing="16">
+                <ComboBox x:Name="StrategyCombo" Header="Strategy" Width="220" />
+                <ComboBox x:Name="ThreadsCombo" Header="Threads" Width="140" />
+            </StackPanel>
             <ProgressBar x:Name="Progress" Minimum="0" Maximum="100" />
+            <TextBlock x:Name="LiveStatusText" TextWrapping="Wrap" Opacity="0.8" />
             <TextBlock x:Name="StatusText" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" Spacing="8">
                 <Button x:Name="CompressBtn" Content="Compress" Click="OnCompressClick" />
                 <Button x:Name="DecompressBtn" Content="Decompress" Click="OnDecompressClick" />
+                <Button x:Name="CancelBtn" Content="Cancel" Click="OnCancelClick" IsEnabled="False" />
             </StackPanel>
+            <TextBlock Text="Tip: drag files onto this window, or double-click a .cpz file in Explorer." Opacity="0.5" />
 
             <TextBlock Text="Archive (.cza)" FontWeight="SemiBold" Margin="0,16,0,0" />
             <TextBox x:Name="ArchivePath" Header="Archive file" />

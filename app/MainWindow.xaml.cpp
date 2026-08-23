@@ -25,23 +25,30 @@ using namespace Microsoft::UI::Xaml;
 
 namespace {
 
-// Marshals engine progress events (worker threads) to the UI thread.
+// Marshals engine progress events (worker threads) to the UI thread,
+// accumulating per-chunk bytes so the UI can show a live ratio.
 class UiEventListener final : public compression::events::IEventListener {
 public:
   UiEventListener(winrt::Microsoft::UI::Dispatching::DispatcherQueue queue,
-                 std::function<void(uint8_t)> onProgress)
+                 std::function<void(uint8_t, uint64_t, uint64_t)> onProgress)
       : queue_(queue), onProgress_(std::move(onProgress)) {}
 
   void onEvent(const compression::events::CompressionEvent &event) override {
     if (event.type == compression::events::EventType::ChunkProgress) {
+      bytesIn_ += event.bytesIn;
+      bytesOut_ += event.bytesOut;
       queue_.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueueHandler{
-          [this, pct = event.progressPct]() { onProgress_(pct); }});
+          [this, pct = event.progressPct]() {
+            onProgress_(pct, bytesIn_, bytesOut_);
+          }});
     }
   }
 
 private:
   winrt::Microsoft::UI::Dispatching::DispatcherQueue queue_{nullptr};
-  std::function<void(uint8_t)> onProgress_;
+  std::function<void(uint8_t, uint64_t, uint64_t)> onProgress_;
+  uint64_t bytesIn_ = 0;
+  uint64_t bytesOut_ = 0;
 };
 
 HWND WindowHandle(winrt::Microsoft::UI::Xaml::Window const &window) {
@@ -100,6 +107,10 @@ std::wstring PickSaveFile(HWND hwnd) {
                                         CLSCTX_INPROC_SERVER,
                                         IID_PPV_ARGS(dlg.put())));
   winrt::check_hresult(dlg->SetOptions(FOS_FORCEFILESYSTEM));
+  const COMDLG_FILTERSPEC types[] = {
+      {L"Compressor files", L"*.cpz"}, {L"All files", L"*.*"}};
+  winrt::check_hresult(dlg->SetFileTypes(2, types));
+  winrt::check_hresult(dlg->SetDefaultExtension(L"cpz"));
   if (FAILED(dlg->Show(hwnd))) {
     return L"";
   }
@@ -135,11 +146,19 @@ MainWindow::MainWindow() {
     }
   }
 
-  // Progress events -> progress bar.
+  // Threads selector: Auto(0), 1, 2, 4, 8.
+  for (const wchar_t *t : {L"Auto", L"1", L"2", L"4", L"8"}) {
+    ThreadsCombo().Items().Append(box_value(winrt::hstring{t}));
+  }
+  ThreadsCombo().SelectedIndex(0);
+
+  // Progress events -> progress bar + live ratio line.
   bus_ = std::make_shared<compression::events::EventBus>();
-  listener_ = std::make_shared<UiEventListener>(queue_, [this](uint8_t pct) {
-    Progress().Value(pct);
-  });
+  listener_ = std::make_shared<UiEventListener>(
+      queue_, [this](uint8_t pct, uint64_t in, uint64_t out) {
+        Progress().Value(pct);
+        LiveStatusText().Text(winrt::hstring{FormatLiveStatus(pct, in, out)});
+      });
   bus_->subscribe(listener_);
 
   // App icon (from the embedded resource).
@@ -230,6 +249,10 @@ void MainWindow::SetArchiveStatus(std::wstring text) {
 }
 
 void MainWindow::Run(bool compress) {
+  if (busy_) {
+    SetStatus(L"An operation is already running.");
+    return;
+  }
   const std::wstring inPath(InputPath().Text());
   const std::wstring outPath(OutputPath().Text());
   if (inPath.empty() || outPath.empty()) {
@@ -242,41 +265,108 @@ void MainWindow::Run(bool compress) {
       (index >= 0 && index < static_cast<int>(strategyIds_.size()))
           ? strategyIds_[static_cast<std::size_t>(index)]
           : compression::format::AlgorithmID::OPTIMIZED_COMPRESSOR;
+  static const int kThreads[] = {0, 1, 2, 4, 8};
+  const int threadIndex = static_cast<int>(ThreadsCombo().SelectedIndex());
+  const int threads =
+      (threadIndex >= 0 && threadIndex < 5) ? kThreads[threadIndex] : 0;
+
+  busy_ = true;
+  cancel_ = false;
+  compressMode_ = compress;
+  CompressBtn().IsEnabled(false);
+  DecompressBtn().IsEnabled(false);
+  CancelBtn().IsEnabled(true);
+  Progress().Value(0);
+  LiveStatusText().Text(L"");
 
   // Engine work runs off the UI thread; results marshal back via the
   // DispatcherQueue.
-  std::thread([this, compress, codec, inPath, outPath]() {
+  std::thread([this, compress, codec, threads, inPath, outPath]() {
     try {
       compression::CompressionService service(bus_);
       if (compress) {
         compression::CompressionOptions options;
         options.codec = codec;
+        options.threads = static_cast<std::size_t>(threads);
         const auto r = service.compressFile(
             std::filesystem::path(inPath), std::filesystem::path(outPath), options);
-        wchar_t buf[256];
-        swprintf_s(buf, L"Compressed %llu -> %llu bytes (ratio %.2f%%, CRC 0x%08X)",
-                   static_cast<unsigned long long>(r.inBytes),
-                   static_cast<unsigned long long>(r.outBytes),
-                   r.ratio * 100.0, r.crc);
-        SetStatus(buf);
+        if (cancel_) {
+          std::error_code ec;
+          std::filesystem::remove(std::filesystem::path(outPath), ec);
+          SetStatus(L"Cancelled - partial output removed.");
+        } else {
+          wchar_t buf[256];
+          swprintf_s(buf, L"Compressed %llu -> %llu bytes (ratio %.2f%%, CRC 0x%08X)",
+                     static_cast<unsigned long long>(r.inBytes),
+                     static_cast<unsigned long long>(r.outBytes),
+                     r.ratio * 100.0, r.crc);
+          SetStatus(buf);
+        }
       } else {
         const auto r = service.decompressFile(
             std::filesystem::path(inPath), std::filesystem::path(outPath));
-        wchar_t buf[256];
-        swprintf_s(buf, L"Decompressed %llu -> %llu bytes, CRC verified: %ls",
-                   static_cast<unsigned long long>(r.inBytes),
-                   static_cast<unsigned long long>(r.outBytes),
-                   r.verified ? L"yes" : L"NO");
-        SetStatus(buf);
-        if (!r.verified) {
-          SetStatus(L"Decompressed data FAILED CRC verification!");
+        if (cancel_) {
+          std::error_code ec;
+          std::filesystem::remove(std::filesystem::path(outPath), ec);
+          SetStatus(L"Cancelled - partial output removed.");
+        } else {
+          wchar_t buf[256];
+          swprintf_s(buf, L"Decompressed %llu -> %llu bytes, CRC verified: %ls",
+                     static_cast<unsigned long long>(r.inBytes),
+                     static_cast<unsigned long long>(r.outBytes),
+                     r.verified ? L"yes" : L"NO");
+          SetStatus(buf);
+          if (!r.verified) {
+            SetStatus(L"Decompressed data FAILED CRC verification!");
+          }
         }
       }
     } catch (const std::exception &e) {
       std::wstring msg(e.what(), e.what() + strlen(e.what()));
       SetStatus(L"Engine error: " + msg);
     }
+    queue_.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueueHandler{
+        [this]() {
+          busy_ = false;
+          CompressBtn().IsEnabled(true);
+          DecompressBtn().IsEnabled(true);
+          CancelBtn().IsEnabled(false);
+        }});
   }).detach();
+}
+
+void MainWindow::OnCancelClick(IInspectable const &, RoutedEventArgs const &) {
+  if (busy_) {
+    cancel_ = true;
+    CancelBtn().IsEnabled(false);
+    LiveStatusText().Text(L"Cancelling... (finishes the current block)");
+  }
+}
+
+std::wstring MainWindow::FormatLiveStatus(uint8_t pct, uint64_t in, uint64_t out) {
+  auto fmt = [](uint64_t v) {
+    wchar_t buf[32];
+    if (v >= 1024ull * 1024 * 1024) {
+      swprintf_s(buf, L"%.1f GB", static_cast<double>(v) / (1024 * 1024 * 1024));
+    } else if (v >= 1024ull * 1024) {
+      swprintf_s(buf, L"%.1f MB", static_cast<double>(v) / (1024 * 1024));
+    } else if (v >= 1024) {
+      swprintf_s(buf, L"%.1f KB", static_cast<double>(v) / 1024);
+    } else {
+      swprintf_s(buf, L"%llu B", static_cast<unsigned long long>(v));
+    }
+    return std::wstring(buf);
+  };
+  wchar_t buf[160];
+  if (compressMode_) {
+    const double ratio = (in > 0) ? (static_cast<double>(out) * 100.0 / in) : 0.0;
+    swprintf_s(buf, L"Compressing %u%%  |  %ls -> %ls  |  ratio %.1f%%",
+               static_cast<unsigned>(pct), fmt(in).c_str(), fmt(out).c_str(), ratio);
+  } else {
+    swprintf_s(buf, L"Decompressing %u%%  |  %ls -> %ls",
+               static_cast<unsigned>(pct), fmt(in).c_str(), fmt(out).c_str());
+  }
+  return std::wstring(buf);
 }
 
 // --- File pickers (native IFileDialog; no WinRT picker projection needed) ---
@@ -340,6 +430,48 @@ void MainWindow::OnExtractArchiveClick(IInspectable const &,
   }
   const int32_t index = static_cast<int32_t>(ArchiveEntries().SelectedIndex());
   DoArchiveExtract(archivePath, index, folders[0]);
+}
+
+// --- Drag & drop + launch-with-file ---
+
+void MainWindow::OnDragOver(IInspectable const &,
+                            winrt::Microsoft::UI::Xaml::DragEventArgs const &e) {
+  e.AcceptedOperation(winrt::Windows::ApplicationModel::DataTransfer::DataPackageOperation::Copy);
+}
+
+void MainWindow::OnDrop(IInspectable const &,
+                        winrt::Microsoft::UI::Xaml::DragEventArgs const &e) {
+  try {
+    const auto items = e.DataView().GetStorageItemsAsync().get();
+    if (items.Size() == 0) {
+      return;
+    }
+    std::wstring first;
+    for (const auto &item : items) {
+      if (!first.empty()) {
+        break;
+      }
+      if (const auto file = item.try_as<winrt::Windows::Storage::StorageFile>()) {
+        first = std::wstring(file.Path());
+      }
+    }
+    if (!first.empty()) {
+      InputPath().Text(winrt::hstring{first});
+      if (items.Size() > 1) {
+        SetStatus(L"Dropped " + std::to_wstring(items.Size()) +
+                  L" files - use the Archive section to bundle them.");
+      } else {
+        SetStatus(L"File loaded from drop.");
+      }
+    }
+  } catch (...) {
+    SetStatus(L"Could not read the dropped files.");
+  }
+}
+
+void MainWindow::PrefillInput(const std::wstring &path) {
+  InputPath().Text(winrt::hstring{path});
+  SetStatus(L"File opened: " + path);
 }
 
 // --- Archive operations (also used by the --uitest harness) ---

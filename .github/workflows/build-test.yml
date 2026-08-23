@@ -39,7 +39,7 @@ jobs:
         $bytes = New-Object byte[] 100000
         (New-Object System.Random(42)).NextBytes($bytes)
         [System.IO.File]::WriteAllBytes("e2e_in.bin", $bytes)
-        $p = Start-Process -FilePath $exe -ArgumentList "compress","e2e_in.bin","e2e_out.cpz","ans" -Wait -PassThru -NoNewWindow
+        $p = Start-Process -FilePath $exe -ArgumentList "compress","e2e_in.bin","e2e_out.cpz","ans","4" -Wait -PassThru -NoNewWindow
         if ($p.ExitCode -ne 0) { throw "headless compress failed: $($p.ExitCode)" }
         $p = Start-Process -FilePath $exe -ArgumentList "decompress","e2e_out.cpz","e2e_back.bin" -Wait -PassThru -NoNewWindow
         if ($p.ExitCode -ne 0) { throw "headless decompress failed: $($p.ExitCode)" }

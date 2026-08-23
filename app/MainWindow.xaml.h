@@ -10,6 +10,7 @@
 #include <winrt/Microsoft.UI.Xaml.Controls.h>
 #include <winrt/Windows.Foundation.h>
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
@@ -42,6 +43,13 @@ struct MainWindow : MainWindowT<MainWindow> {
   void OnCheckUpdatesClick(winrt::Windows::Foundation::IInspectable const &,
                            winrt::Microsoft::UI::Xaml::RoutedEventArgs const &);
   winrt::Windows::Foundation::IAsyncAction CheckForUpdatesAsync(bool showWhenCurrent);
+  void OnCancelClick(winrt::Windows::Foundation::IInspectable const &,
+                     winrt::Microsoft::UI::Xaml::RoutedEventArgs const &);
+  void OnDragOver(winrt::Windows::Foundation::IInspectable const &,
+                  winrt::Microsoft::UI::Xaml::DragEventArgs const &);
+  void OnDrop(winrt::Windows::Foundation::IInspectable const &,
+              winrt::Microsoft::UI::Xaml::DragEventArgs const &);
+  void PrefillInput(const std::wstring &path);
 
   // Picker-free entry points (used by the --uitest harness).
   bool DoArchiveCreate(const std::wstring &outPath,
@@ -52,11 +60,15 @@ struct MainWindow : MainWindowT<MainWindow> {
 
 private:
   void Run(bool compress);
+  std::wstring FormatLiveStatus(uint8_t pct, uint64_t in, uint64_t out);
   void SetStatus(std::wstring text);
   void SetArchiveStatus(std::wstring text);
 
   winrt::Microsoft::UI::Dispatching::DispatcherQueue queue_{nullptr};
   std::vector<compression::format::AlgorithmID> strategyIds_;
+  std::atomic<bool> busy_{false};
+  std::atomic<bool> cancel_{false};
+  std::atomic<bool> compressMode_{true};
   std::shared_ptr<compression::events::EventBus> bus_;
   std::shared_ptr<compression::events::IEventListener> listener_;
   std::vector<compression::archive::ArchiveEntry> entries_;
