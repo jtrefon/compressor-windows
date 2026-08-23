@@ -46,10 +46,14 @@ jobs:
       shell: pwsh
       run: |
         $exe = "dist\CompressorWindows\CompressorWindows.exe"
+        Get-ChildItem dist\CompressorWindows | Select-Object -ExpandProperty Name
         $bytes = New-Object byte[] 50000
         (New-Object System.Random(7)).NextBytes($bytes)
         [System.IO.File]::WriteAllBytes("e2e_in.bin", $bytes)
-        $p = Start-Process -FilePath $exe -ArgumentList "compress","e2e_in.bin","e2e_out.cpz","optimized" -Wait -PassThru -NoNewWindow
+        $p = Start-Process -FilePath $exe -ArgumentList "compress","e2e_in.bin","e2e_out.cpz","optimized" -Wait -PassThru -NoNewWindow -RedirectStandardOutput "e2e_stdout.txt" -RedirectStandardError "e2e_stderr.txt"
+        Write-Host "exit code: [$($p.ExitCode)]"
+        if (Test-Path e2e_stdout.txt) { Get-Content e2e_stdout.txt }
+        if (Test-Path e2e_stderr.txt) { Get-Content e2e_stderr.txt }
         if ($p.ExitCode -ne 0) { throw "staged compress failed: $($p.ExitCode)" }
         $p = Start-Process -FilePath $exe -ArgumentList "decompress","e2e_out.cpz","e2e_back.bin" -Wait -PassThru -NoNewWindow
         if ($p.ExitCode -ne 0) { throw "staged decompress failed: $($p.ExitCode)" }
