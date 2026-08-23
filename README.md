@@ -8,8 +8,8 @@ format and integrity logic lives in the engine.
 ## Build
 
 ```bat
-python -m aqt install-qt windows desktop 6.7.2 win64_msvc2022_64 --outputdir %TEMP%\Qt
-cmake -S . -B build -DCMAKE_PREFIX_PATH=%TEMP%\Qt\6.7.2\msvc2022_64
+python -m aqt install-qt windows desktop 6.7.2 win64_msvc2019_64 --outputdir %TEMP%\Qt
+cmake -S . -B build -DCMAKE_PREFIX_PATH=%TEMP%\Qt\6.7.2\msvc2019_64
 cmake --build build --config Release
 ctest --test-dir build --output-on-failure
 ```
