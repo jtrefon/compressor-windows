@@ -1,6 +1,7 @@
 #pragma once
 
-#include "MainWindow.xaml.g.h"
+#include "MainWindow.g.h"
+#include "pch.h"
 
 #include <compression/FileFormat.hpp>
 

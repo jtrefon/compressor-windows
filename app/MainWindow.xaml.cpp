@@ -1,5 +1,8 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#if __has_include("MainWindow.g.cpp")
+#include "MainWindow.g.cpp"
+#endif
 
 #include <compression/app/CompressionService.hpp>
 #include <compression/codec/CodecRegistry.hpp>
