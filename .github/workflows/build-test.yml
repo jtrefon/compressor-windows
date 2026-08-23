@@ -75,25 +75,31 @@ jobs:
     - name: "Archive test: headless create/verify + UI-driven create/verify/extract"
       shell: pwsh
       run: |
-        function Invoke-App([string[]]$args) {
-          $p = Start-Process -FilePath $exe -ArgumentList $args -PassThru -NoNewWindow
-          if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "app timed out: $($args -join ' ')" }
-          return $p
-        }
         $exe = "app\x64\Release\CompressorWindows\CompressorWindows.exe"
         [System.IO.File]::WriteAllBytes("arch_a.bin", [System.Text.Encoding]::UTF8.GetBytes(("archive payload A alpha beta gamma\n" * 300)))
         [System.IO.File]::WriteAllBytes("arch_b.bin", [System.Text.Encoding]::UTF8.GetBytes(("archive payload B delta epsilon zeta\n" * 400)))
-        $probe = @("archive","create")
-        $p = Start-Process -FilePath $exe -ArgumentList $probe -PassThru -NoNewWindow -RedirectStandardOutput "dbg_out.txt" -RedirectStandardError "dbg_err.txt"
-        if (-not $p.WaitForExit(30000)) { Stop-Process -Id $p.Id -Force; throw "probe1 (2 args) timed out" }
-        Write-Host "probe1 exit: $($p.ExitCode)"; Get-Content "dbg_out.txt","dbg_err.txt" -ErrorAction SilentlyContinue
-        $p = Start-Process -FilePath $exe -ArgumentList @("archive","create","probe3.cza") -PassThru -NoNewWindow -RedirectStandardOutput "dbg_out.txt" -RedirectStandardError "dbg_err.txt"
-        if (-not $p.WaitForExit(30000)) { Stop-Process -Id $p.Id -Force; throw "probe2 (3 args) timed out" }
-        Write-Host "probe2 exit: $($p.ExitCode)"; Get-Content "dbg_out.txt","dbg_err.txt" -ErrorAction SilentlyContinue
-        $p = Start-Process -FilePath $exe -ArgumentList @("archive","create","probe4.cza","arch_a.bin") -PassThru -NoNewWindow -RedirectStandardOutput "dbg_out.txt" -RedirectStandardError "dbg_err.txt"
-        if (-not $p.WaitForExit(30000)) { Stop-Process -Id $p.Id -Force; throw "probe3 (4 args) timed out" }
-        Write-Host "probe3 exit: $($p.ExitCode)"; Get-Content "dbg_out.txt","dbg_err.txt" -ErrorAction SilentlyContinue
-        Write-Host "ALL PROBES DONE"
+        $p = Start-Process -FilePath $exe -ArgumentList @("archive","create","headless_test.cza","arch_a.bin","arch_b.bin") -PassThru -NoNewWindow
+        if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "headless archive create timed out" }
+        if ($p.ExitCode -ne 0) { throw "headless archive create failed: $($p.ExitCode)" }
+        $p = Start-Process -FilePath $exe -ArgumentList @("archive","verify","headless_test.cza") -PassThru -NoNewWindow
+        if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "headless archive verify timed out" }
+        if ($p.ExitCode -ne 0) { throw "headless archive verify failed: $($p.ExitCode)" }
+        New-Item -ItemType Directory -Force -Path ui_extract_dir | Out-Null
+        $p = Start-Process -FilePath $exe -ArgumentList @("--uitest","archive-create","--in","ui_test.cza","--files","arch_a.bin,arch_b.bin","--result","ui_arch_create.result") -PassThru -NoNewWindow
+        if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "UI archive create timed out" }
+        $r = Get-Content "ui_arch_create.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "UI archive create failed: $r" }
+        $p = Start-Process -FilePath $exe -ArgumentList @("--uitest","archive-verify","--in","ui_test.cza","--result","ui_arch_verify.result") -PassThru -NoNewWindow
+        if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "UI archive verify timed out" }
+        $r = Get-Content "ui_arch_verify.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "UI archive verify failed: $r" }
+        $p = Start-Process -FilePath $exe -ArgumentList @("--uitest","archive-extract","--in","ui_test.cza","--out","ui_extract_dir","--entry","0","--result","ui_arch_extract.result") -PassThru -NoNewWindow
+        if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "UI archive extract timed out" }
+        $r = Get-Content "ui_arch_extract.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "UI archive extract failed: $r" }
+        $extracted = Get-ChildItem ui_extract_dir -Recurse -File | Select-Object -First 1
+        if (-not $extracted) { throw "UI archive extract produced no files" }
+        Write-Host "ARCHIVE TESTS OK"
         $p = Invoke-App @("archive","verify","headless_test.cza")
         if ($p.ExitCode -ne 0) { throw "headless archive verify failed: $($p.ExitCode)" }
         New-Item -ItemType Directory -Force -Path ui_extract_dir | Out-Null
