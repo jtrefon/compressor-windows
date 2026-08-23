@@ -28,15 +28,21 @@ using namespace compression;
 // Runs the same facade the GUI uses; results go to stdout, exit code signals
 // success/failure so tests can assert on it.
 int RunHeadless(const std::vector<std::wstring> &args) {
-  if (args.size() < 3 || args.size() > 4) {
+  if (args.empty()) {
     fprintf(stderr,
             "usage: CompressorWindows compress <in> <out> [codec]\n"
-            "                 decompress <in> <out>\n");
+            "                 decompress <in> <out>\n"
+            "                 archive create <out.cza> <file> [file...]\n"
+            "                 archive verify <in.cza>\n");
     return 2;
   }
   try {
     compression::CompressionService service;
     if (args[0] == L"compress") {
+      if (args.size() < 3 || args.size() > 4) {
+        fprintf(stderr, "usage: compress <in> <out> [codec]\n");
+        return 2;
+      }
       compression::CompressionOptions options;
       if (args.size() == 4) {
         const std::string codecName(args[3].begin(), args[3].end());
@@ -55,6 +61,10 @@ int RunHeadless(const std::vector<std::wstring> &args) {
       return 0;
     }
     if (args[0] == L"decompress") {
+      if (args.size() != 3) {
+        fprintf(stderr, "usage: decompress <in> <out>\n");
+        return 2;
+      }
       const auto r = service.decompressFile(
           std::filesystem::path(args[1]), std::filesystem::path(args[2]));
       printf("decompressed %llu -> %llu bytes, verified %s\n",
@@ -71,6 +81,10 @@ int RunHeadless(const std::vector<std::wstring> &args) {
   if (args[0] == L"archive" && args.size() >= 3) {
     compression::ArchiveService archive;
     if (args[1] == L"create" && args.size() >= 4) {
+      if (args.size() > 4096) {
+        fprintf(stderr, "too many files\n");
+        return 2;
+      }
       archive::ArchiveBuildOptions options;
       std::vector<ArchiveEntrySource> entries;
       for (std::size_t i = 3; i < args.size(); ++i) {
