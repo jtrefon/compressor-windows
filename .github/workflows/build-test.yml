@@ -34,8 +34,9 @@ jobs:
         Get-ChildItem -Path app -Recurse -Filter "CompressorWindows.2.h" | Select-Object -ExpandProperty FullName
         Get-ChildItem -Path app -Recurse -Filter "*.g.hpp" | Select-Object -ExpandProperty FullName
         $h = Get-ChildItem -Path app -Recurse -Filter "CompressorWindows.2.h" | Select-Object -First 1
-        if ($h) { Select-String -Path $h.FullName -Pattern "MainWindow_base" | Select-Object -First 6 | ForEach-Object { $_.Line.Trim() } }
-        Get-ChildItem -Path app -Recurse -Filter "MainWindow.winmd" | Select-Object -ExpandProperty FullName
+        if ($h) { Get-Content $h.FullName -TotalCount 30 }
+        Get-ChildItem -Path app -Recurse -Filter "*.winmd" | Select-Object -ExpandProperty FullName
+        Get-ChildItem -Path app -Recurse -Filter "module.g.cpp" | Select-Object -ExpandProperty FullName
 
     - name: Run contract tests (anti-corruption gate)
       working-directory: build
