@@ -42,6 +42,23 @@ jobs:
         if ($vc) { Copy-Item (Join-Path (Split-Path $vc.FullName) '*.dll') dist\CompressorWindows\ }
         if (-not (Test-Path dist\CompressorWindows\CompressorWindows.exe)) { throw "app exe missing" }
 
+    - name: E2E: staged portable executable round trip (headless mode)
+      shell: pwsh
+      run: |
+        $exe = "dist\CompressorWindows\CompressorWindows.exe"
+        $bytes = New-Object byte[] 50000
+        (New-Object System.Random(7)).NextBytes($bytes)
+        [System.IO.File]::WriteAllBytes("e2e_in.bin", $bytes)
+        & $exe compress e2e_in.bin e2e_out.cpz optimized
+        if ($LASTEXITCODE -ne 0) { throw "staged compress failed: $LASTEXITCODE" }
+        & $exe decompress e2e_out.cpz e2e_back.bin
+        if ($LASTEXITCODE -ne 0) { throw "staged decompress failed: $LASTEXITCODE" }
+        $a = [System.IO.File]::ReadAllBytes("e2e_in.bin")
+        $b = [System.IO.File]::ReadAllBytes("e2e_back.bin")
+        if ($a.Length -ne $b.Length) { throw "E2E size mismatch" }
+        for ($i = 0; $i -lt $a.Length; $i++) { if ($a[$i] -ne $b[$i]) { throw "E2E byte mismatch at $i" } }
+        Write-Host "STAGED E2E ROUND TRIP OK"
+
     - name: Package portable zip
       run: Compress-Archive -Path dist\CompressorWindows -DestinationPath dist\CompressorWindows-${{ github.ref_name }}.zip
 
@@ -50,6 +67,23 @@ jobs:
 
     - name: Build installer
       run: '& "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=${{ github.ref_name }} installer.nsi'
+
+    - name: Verify installer installs and uninstalls
+      shell: pwsh
+      run: |
+        $inst = "C:\CompressorWindowsTest"
+        Start-Process -Wait -FilePath "CompressorWindows-${{ github.ref_name }}-setup.exe" -ArgumentList "/S", "/D=$inst"
+        if (-not (Test-Path "$inst\CompressorWindows.exe")) { throw "installer did not install the exe" }
+        if (-not (Test-Path "$inst\uninstall.exe")) { throw "installer did not install the uninstaller" }
+        $p = Start-Process -FilePath "$inst\CompressorWindows.exe" -PassThru
+        Start-Sleep -Seconds 5
+        if ($p.HasExited) { throw "installed app exited immediately (runtime missing?)" }
+        Stop-Process -Id $p.Id -Force
+        Start-Sleep -Seconds 1
+        & "$inst\uninstall.exe" /S
+        Start-Sleep -Seconds 3
+        if (Test-Path "$inst") { throw "uninstaller did not remove the install directory" }
+        Write-Host "INSTALLER VERIFICATION OK"
 
     - name: Compute checksums
       run: |

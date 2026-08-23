@@ -31,3 +31,20 @@ jobs:
       working-directory: build
       run: ctest -C Release --output-on-failure
 
+    - name: E2E: executable round trip (headless mode)
+      shell: pwsh
+      run: |
+        $exe = "app\x64\Release\CompressorWindows\CompressorWindows.exe"
+        $bytes = New-Object byte[] 100000
+        (New-Object System.Random(42)).NextBytes($bytes)
+        [System.IO.File]::WriteAllBytes("e2e_in.bin", $bytes)
+        & $exe compress e2e_in.bin e2e_out.cpz ans
+        if ($LASTEXITCODE -ne 0) { throw "headless compress failed: $LASTEXITCODE" }
+        & $exe decompress e2e_out.cpz e2e_back.bin
+        if ($LASTEXITCODE -ne 0) { throw "headless decompress failed: $LASTEXITCODE" }
+        $a = [System.IO.File]::ReadAllBytes("e2e_in.bin")
+        $b = [System.IO.File]::ReadAllBytes("e2e_back.bin")
+        if ($a.Length -ne $b.Length) { throw "E2E size mismatch" }
+        for ($i = 0; $i -lt $a.Length; $i++) { if ($a[$i] -ne $b[$i]) { throw "E2E byte mismatch at $i" } }
+        Write-Host "E2E ROUND TRIP OK"
+
