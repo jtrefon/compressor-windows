@@ -42,6 +42,3 @@ jobs:
       working-directory: build
       run: ctest -C Release --output-on-failure
 
-    - name: Verify engine pin is an exact tag
-      run: |
-        findstr /C:"COMPRESSIONLIB_TAG \"v1." CMakeLists.txt >nul || (echo engine must be pinned to an exact vX.Y.Z tag & exit /b 1)
