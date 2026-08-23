@@ -1,8 +1,11 @@
 #include "pch.h"
 #include "MainWindow.xaml.h"
+#include "UpdateService.h"
 
 #include <compression/app/CompressionService.hpp>
 #include <compression/codec/CodecRegistry.hpp>
+
+#include <winrt/Windows.System.h>
 
 #include <microsoft.ui.xaml.window.h>
 #include <shobjidl.h>
@@ -145,6 +148,61 @@ MainWindow::MainWindow() {
   if (icon != nullptr) {
     SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon));
     SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon));
+  }
+
+  VersionText().Text(winrt::hstring{L"version "} +
+                     winrt::hstring{updates::kAppVersion});
+
+  // Quiet update check shortly after launch (skipped in automation modes).
+  int argc = 0;
+  wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+  bool automated = false;
+  for (int i = 1; i < argc; ++i) {
+    if (wcscmp(argv[i], L"--uitest") == 0 || wcscmp(argv[i], L"compress") == 0 ||
+        wcscmp(argv[i], L"decompress") == 0 || wcscmp(argv[i], L"archive") == 0 ||
+        wcscmp(argv[i], L"--version") == 0) {
+      automated = true;
+      break;
+    }
+  }
+  if (argv != nullptr) {
+    LocalFree(argv);
+  }
+  if (!automated && queue_) {
+    queue_.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueueHandler{
+        [this]() { CheckForUpdatesAsync(false); }});
+  }
+}
+
+void MainWindow::OnCheckUpdatesClick(IInspectable const &,
+                                     RoutedEventArgs const &) {
+  CheckForUpdatesAsync(true);
+}
+
+winrt::Windows::Foundation::IAsyncAction MainWindow::CheckForUpdatesAsync(bool showWhenCurrent) {
+  const auto info = co_await updates::CheckForUpdate();
+  winrt::Microsoft::UI::Xaml::Controls::ContentDialog dialog;
+  dialog.XamlRoot(Content().XamlRoot());
+  if (info.available) {
+    dialog.Title(winrt::box_value(winrt::hstring{L"Update available: "} +
+                                  winrt::hstring{info.version}));
+    dialog.Content(winrt::box_value(winrt::hstring{info.notes.empty() ? L"A new version is available." : info.notes}));
+    dialog.PrimaryButtonText(L"Download");
+    dialog.CloseButtonText(L"Later");
+    dialog.DefaultButton(winrt::Microsoft::UI::Xaml::Controls::ContentDialogButton::Primary);
+    const auto result = co_await dialog.ShowAsync();
+    if (result == winrt::Microsoft::UI::Xaml::Controls::ContentDialogResult::Primary &&
+        !info.downloadUrl.empty()) {
+      co_await winrt::Windows::System::Launcher::LaunchUriAsync(
+          winrt::Windows::Foundation::Uri{info.downloadUrl});
+    }
+  } else if (showWhenCurrent) {
+    dialog.Title(winrt::box_value(winrt::hstring{L"You are up to date"}));
+    dialog.Content(winrt::box_value(winrt::hstring{L"Version "} +
+                                    winrt::hstring{updates::kAppVersion} +
+                                    L" is the latest release."));
+    dialog.CloseButtonText(L"OK");
+    co_await dialog.ShowAsync();
   }
 }
 

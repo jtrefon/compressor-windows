@@ -74,6 +74,17 @@ jobs:
         Write-Host "UI TEST ROUND TRIP OK"
         exit 0
 
+    - name: "Version gate: --version reports a valid semver"
+      shell: pwsh
+      run: |
+        $exe = "app\x64\Release\CompressorWindows\CompressorWindows.exe"
+        $p = Start-Process -FilePath $exe -ArgumentList @("--version") -Wait -PassThru -NoNewWindow -RedirectStandardOutput "ver_out.txt"
+        if ($p.ExitCode -ne 0) { throw "--version failed: $($p.ExitCode)" }
+        $v = (Get-Content "ver_out.txt" -ErrorAction Stop).Trim()
+        if ($v -notmatch "^v?\d+\.\d+\.\d+$") { throw "--version output invalid: [$v]" }
+        Write-Host "VERSION GATE OK: $v"
+        exit 0
+
     - name: "Archive test: headless create/verify + UI-driven create/verify/extract"
       shell: pwsh
       run: |

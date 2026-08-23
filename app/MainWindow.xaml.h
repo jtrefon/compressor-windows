@@ -39,6 +39,10 @@ struct MainWindow : MainWindowT<MainWindow> {
   void OnExtractArchiveClick(winrt::Windows::Foundation::IInspectable const &,
                              winrt::Microsoft::UI::Xaml::RoutedEventArgs const &);
 
+  void OnCheckUpdatesClick(winrt::Windows::Foundation::IInspectable const &,
+                           winrt::Microsoft::UI::Xaml::RoutedEventArgs const &);
+  winrt::Windows::Foundation::IAsyncAction CheckForUpdatesAsync(bool showWhenCurrent);
+
   // Picker-free entry points (used by the --uitest harness).
   bool DoArchiveCreate(const std::wstring &outPath,
                        const std::vector<std::wstring> &files);

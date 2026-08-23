@@ -3,6 +3,7 @@
 #include "MainWindow.xaml.h"
 
 #include <compression/app/ArchiveService.hpp>
+#include "UpdateService.h"
 #include <compression/app/CompressionService.hpp>
 #include <compression/codec/CodecRegistry.hpp>
 
@@ -28,6 +29,11 @@ using namespace compression;
 // Runs the same facade the GUI uses; results go to stdout, exit code signals
 // success/failure so tests can assert on it.
 int RunHeadless(const std::vector<std::wstring> &args) {
+  if (!args.empty() && args[0] == L"--version") {
+    wprintf(L"%ls\n", updates::kAppVersion);
+    fflush(stdout);
+    return 0;
+  }
   if (args.empty()) {
     fprintf(stderr,
             "usage: CompressorWindows compress <in> <out> [codec]\n"
