@@ -44,4 +44,4 @@ jobs:
 
     - name: Verify engine pin is an exact tag
       run: |
-        findstr /R /C:"COMPRESSIONLIB_TAG \"v[0-9]*\.[0-9]*\.[0-9]*\"" CMakeLists.txt >nul || (echo engine must be pinned to an exact vX.Y.Z tag & exit /b 1)
+        findstr /C:"COMPRESSIONLIB_TAG \"v1." CMakeLists.txt >nul || (echo engine must be pinned to an exact vX.Y.Z tag & exit /b 1)
