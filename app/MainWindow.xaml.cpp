@@ -331,7 +331,7 @@ bool MainWindow::DoArchiveOpen(const std::wstring &archivePath) {
       swprintf_s(buf, L"%ls  (%llu bytes)",
                  Widen(e.name).c_str(),
                  static_cast<unsigned long long>(e.rawSize));
-      ArchiveEntries().Items().Append(box_value(to_hstring(buf)));
+      ArchiveEntries().Items().Append(box_value(to_hstring(std::wstring(buf))));
     }
     const auto verifyResults = archive.verify(std::filesystem::path(archivePath));
     bool allOk = true;
