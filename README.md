@@ -20,6 +20,18 @@ framework — pure Windows App SDK (Fluent native look).
   executable, no runtime install required
 - App icon, per-monitor DPI aware
 
+### Updates
+
+The app checks for updates against the GitHub Releases API directly - the
+repository is the update server, no dedicated infrastructure. A quiet check
+runs on launch; "Check for updates..." is available in the UI. When a newer
+release exists, a dialog shows the release notes with a Download button
+(pointing at the `-setup.exe` asset).
+
+**Version sync rule**: `kAppVersion` in `app/UpdateService.h` must equal the
+next release tag (the updater compares against it). The CI `--version` gate
+keeps the output format valid; the release tag is the source of truth.
+
 ### Code signing
 
 The release pipeline signs the executable and installer **when** the
