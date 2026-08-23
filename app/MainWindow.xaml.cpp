@@ -166,7 +166,7 @@ void MainWindow::SetStatus(std::wstring text) {
 void MainWindow::SetArchiveStatus(std::wstring text) {
   if (queue_) {
     queue_.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueueHandler{
-        [this, text = std::move(text)]() { ArchiveStatusText().Text(to_hstring(text)); }});
+        [this, text = std::move(text)]() { ArchiveStatusText().Text(winrt::hstring{text}); }});
   }
 }
 
