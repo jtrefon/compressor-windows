@@ -124,10 +124,10 @@ jobs:
       with:
         api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
         organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
-        project-slug: compressor-windows
-        signing-policy-slug: release-signing
+        project-slug: Windows_Compressor
+        signing-policy-slug: Windows_Compressor
         github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
-        artifact-configuration-slug: windows-installer
+        artifact-configuration-slug: Windows_Compressor
         wait-for-completion: true
         output-artifact-directory: signed
 
