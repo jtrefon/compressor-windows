@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MainWindow.g.h"
+#include "UpdateService.h"
 
 #include <compression/FileFormat.hpp>
 #include <compression/app/ArchiveService.hpp>
