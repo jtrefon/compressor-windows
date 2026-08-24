@@ -50,16 +50,16 @@ Without signing, the build still produces and publishes unsigned artifacts.
 
 ### Windows SmartScreen / Smart App Control
 
-Current releases are **unsigned** (pending SignPath Foundation approval). On
-Windows 11 with Smart App Control enabled, you will see a blue "Windows
-protected your PC" screen with only a **Don't run** button.
+**v0.1.9+ releases are code-signed via SignPath** — the pipeline submits the
+installer and the app executable to SignPath (PowerShell module, direct
+API — no connector needed) and ships the signed binaries. This removes the
+hard Smart App Control "Don't run only" block.
 
-**Quick workaround:** right-click the `.exe` → Properties → check **Unblock**
-→ Apply → double-click to run. Or use the portable ZIP instead of the installer.
-
-**Permanent fix:** once SignPath is approved, all releases are signed with a
-real OV certificate. The hard SAC block disappears, and users get the standard
-"More info → Run anyway" path. Reputation builds over time and warnings fade.
+Currently the signing certificate is SignPath's self-signed X.509 test
+certificate. The **SignPath Foundation OV certificate** (free OSS program)
+is pending — once approved, we switch the certificate in the SignPath UI
+and every later release is signed with a CA-trusted OV cert that shows a
+real publisher name.
 
 ## Build (Windows, VS 2022+)
 
