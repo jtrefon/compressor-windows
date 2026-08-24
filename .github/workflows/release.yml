@@ -128,7 +128,7 @@ jobs:
         project-slug: Windows_Compressor
         signing-policy-slug: Windows_Compressor
         github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
-        artifact-configuration-slug: Windows_Compressor
+        artifact-configuration-slug: initial
         wait-for-completion: true
         output-artifact-directory: signed
 
