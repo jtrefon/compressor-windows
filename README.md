@@ -41,11 +41,25 @@ keeps the output format valid; the release tag is the source of truth.
 
 ### Code signing
 
-The release pipeline signs the executable and installer **when** the
-`SIGNING_CERT_BASE64` and `SIGNING_CERT_PASSWORD` repository secrets are set
-(SHA-256 + RFC 3161 timestamping via signtool). Without them the build still
-produces and publishes unsigned artifacts (SmartScreen will warn users until a
-real code-signing certificate is provided).
+The release pipeline signs the executable and installer via **SignPath
+Foundation** (free OSS code signing) when `SIGNPATH_API_TOKEN` and
+`SIGNPATH_ORG_ID` secrets are configured. See [docs/SIGNING.md](docs/SIGNING.md)
+for setup. Falls back to a PFX certificate if SignPath is not configured.
+
+Without signing, the build still produces and publishes unsigned artifacts.
+
+### Windows SmartScreen / Smart App Control
+
+Current releases are **unsigned** (pending SignPath Foundation approval). On
+Windows 11 with Smart App Control enabled, you will see a blue "Windows
+protected your PC" screen with only a **Don't run** button.
+
+**Quick workaround:** right-click the `.exe` → Properties → check **Unblock**
+→ Apply → double-click to run. Or use the portable ZIP instead of the installer.
+
+**Permanent fix:** once SignPath is approved, all releases are signed with a
+real OV certificate. The hard SAC block disappears, and users get the standard
+"More info → Run anyway" path. Reputation builds over time and warnings fade.
 
 ## Build (Windows, VS 2022+)
 

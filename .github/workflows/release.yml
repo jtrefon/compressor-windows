@@ -10,6 +10,7 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+      id-token: write
     steps:
     - uses: actions/checkout@v4
 
@@ -36,28 +37,20 @@ jobs:
       run: |
         New-Item -ItemType Directory -Force -Path dist\CompressorWindows | Out-Null
         Copy-Item app\x64\Release\CompressorWindows\* dist\CompressorWindows\ -Recurse
-        # Windows App SDK self-contained runtime + engine are copied by the
-        # build; add the VC runtime so the exe runs on clean machines.
         $vc = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\Enterprise\VC\Redist\MSVC\*\x64\Microsoft.VC145.CRT\*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($vc) { Copy-Item (Join-Path (Split-Path $vc.FullName) '*.dll') dist\CompressorWindows\ }
         if (-not (Test-Path dist\CompressorWindows\CompressorWindows.exe)) { throw "app exe missing" }
 
-    - name: Sign executable (optional; enable with SIGNING_CERT_BASE64 + SIGNING_CERT_PASSWORD secrets)
-      shell: pwsh
-      run: |
-        if ($env:SIGNING_CERT_BASE64 -and $env:SIGNING_CERT_PASSWORD) {
-          $cert = "dist\code_sign.pfx"
-          [IO.File]::WriteAllBytes($cert, [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
-          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $signtool) { throw "signtool not found" }
-          & $signtool.FullName sign /f $cert /p $env:SIGNING_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v dist\CompressorWindows\CompressorWindows.exe
-          if ($LASTEXITCODE -ne 0) { throw "signtool failed: $LASTEXITCODE" }
-          Remove-Item $cert -Force
-          Write-Host "SIGNED EXE OK"
-        } else {
-          Write-Host "SIGNING SKIPPED (set SIGNING_CERT_BASE64/SIGNING_CERT_PASSWORD to enable)"
-        }
+    - name: Build portable zip
+      run: Compress-Archive -Path dist\CompressorWindows -DestinationPath dist\CompressorWindows-${{ github.ref_name }}.zip
 
+    - name: Install NSIS
+      run: choco install nsis -y --no-progress
+
+    - name: Build installer
+      run: '& "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=${{ github.ref_name }} installer.nsi'
+
+    # --- Verify BEFORE signing ---
     - name: "E2E: staged portable executable round trip (headless mode)"
       shell: pwsh
       run: |
@@ -74,15 +67,6 @@ jobs:
         if ($a.Length -ne $b.Length) { throw "E2E size mismatch" }
         for ($i = 0; $i -lt $a.Length; $i++) { if ($a[$i] -ne $b[$i]) { throw "E2E byte mismatch at $i" } }
         Write-Host "STAGED E2E ROUND TRIP OK"
-
-    - name: Package portable zip
-      run: Compress-Archive -Path dist\CompressorWindows -DestinationPath dist\CompressorWindows-${{ github.ref_name }}.zip
-
-    - name: Install NSIS
-      run: choco install nsis -y --no-progress
-
-    - name: Build installer
-      run: '& "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=${{ github.ref_name }} installer.nsi'
 
     - name: Verify installer installs and uninstalls
       shell: pwsh
@@ -119,22 +103,84 @@ jobs:
         if (Test-Path "$inst") { throw "uninstaller did not remove the install directory" }
         Write-Host "INSTALLER VERIFICATION OK"
 
-    - name: Sign installer (optional; same secrets as the exe)
+    # --- Signing: prefer SignPath (free OSS), fall back to PFX, then unsigned ---
+    - name: Upload artifacts for signing
+      if: ${{ env.SIGNPATH_API_TOKEN != '' }}
+      id: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: windows-build
+        path: |
+          dist/CompressorWindows/CompressorWindows.exe
+          CompressorWindows-${{ github.ref_name }}-setup.exe
+        retention-days: 1
+
+    - name: Sign via SignPath Foundation
+      if: ${{ env.SIGNPATH_API_TOKEN != '' }}
+      id: signpath
+      uses: signpath/github-action-submit-signing-request@v1
+      env:
+        SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+      with:
+        api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+        organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+        project-slug: compressor-windows
+        signing-policy-slug: release-signing
+        github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+        artifact-configuration-slug: windows-installer
+        wait-for-completion: true
+        output-artifact-directory: signed
+
+    - name: Apply signed artifacts (SignPath)
+      if: ${{ env.SIGNPATH_API_TOKEN != '' }}
       shell: pwsh
       run: |
-        if ($env:SIGNING_CERT_BASE64 -and $env:SIGNING_CERT_PASSWORD) {
-          $cert = "dist\code_sign.pfx"
-          [IO.File]::WriteAllBytes($cert, [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
-          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $signtool) { throw "signtool not found" }
-          & $signtool.FullName sign /f $cert /p $env:SIGNING_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v CompressorWindows-${{ github.ref_name }}-setup.exe
-          if ($LASTEXITCODE -ne 0) { throw "signtool installer failed: $LASTEXITCODE" }
-          Remove-Item $cert -Force
-          Write-Host "SIGNED INSTALLER OK"
+        $signed = "signed"
+        if (-not (Test-Path "$signed")) { throw "SignPath output directory missing" }
+        # Replace unsigned exe with signed version
+        $signedExe = Get-ChildItem "$signed\CompressorWindows.exe" -ErrorAction SilentlyContinue
+        if ($signedExe) {
+          Copy-Item $signedExe.FullName "dist\CompressorWindows\CompressorWindows.exe" -Force
+          Write-Host "APPLIED SIGNED EXE"
         } else {
-          Write-Host "INSTALLER SIGNING SKIPPED"
+          Write-Host "WARNING: signed exe not found in SignPath output"
         }
+        # Replace unsigned installer with signed version
+        $signedSetup = Get-ChildItem "$signed\*setup.exe" -ErrorAction SilentlyContinue
+        if ($signedSetup) {
+          Copy-Item $signedSetup.FullName "CompressorWindows-${{ github.ref_name }}-setup.exe" -Force
+          Write-Host "APPLIED SIGNED INSTALLER"
+        } else {
+          Write-Host "WARNING: signed installer not found in SignPath output"
+        }
+        # Repackage portable zip with signed exe
+        Compress-Archive -Path dist\CompressorWindows -DestinationPath dist\CompressorWindows-${{ github.ref_name }}.zip -Force
+        Write-Host "REPACKAGED ZIP WITH SIGNED EXE"
 
+    - name: Sign executable (legacy PFX; fallback if no SignPath)
+      if: ${{ env.SIGNPATH_API_TOKEN == '' && env.SIGNING_CERT_BASE64 != '' }}
+      shell: pwsh
+      run: |
+        $cert = "dist\code_sign.pfx"
+        [IO.File]::WriteAllBytes($cert, [Convert]::FromBase64String($env:SIGNING_CERT_BASE64))
+        $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+        if (-not $signtool) { throw "signtool not found" }
+        & $signtool.FullName sign /f $cert /p $env:SIGNING_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v dist\CompressorWindows\CompressorWindows.exe
+        if ($LASTEXITCODE -ne 0) { throw "signtool failed: $LASTEXITCODE" }
+        & $signtool.FullName sign /f $cert /p $env:SIGNING_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /v CompressorWindows-${{ github.ref_name }}-setup.exe
+        if ($LASTEXITCODE -ne 0) { throw "signtool installer failed: $LASTEXITCODE" }
+        Remove-Item $cert -Force
+        Compress-Archive -Path dist\CompressorWindows -DestinationPath dist\CompressorWindows-${{ github.ref_name }}.zip -Force
+        Write-Host "SIGNED WITH PFX (LEGACY) + REPACKAGED ZIP"
+
+    - name: No signing configured
+      if: ${{ env.SIGNPATH_API_TOKEN == '' && env.SIGNING_CERT_BASE64 == '' }}
+      shell: pwsh
+      run: |
+        Write-Host "NO SIGNING CONFIGURED — unsigned build"
+        Write-Host "See docs/SIGNING.md to enable SignPath (free) or PFX signing"
+
+    # --- Checksums + publish ---
     - name: Compute checksums
       run: |
         Get-FileHash -Algorithm SHA256 dist\CompressorWindows-${{ github.ref_name }}.zip | ForEach-Object { "$($_.Hash.ToLower())  $($_.Path.Split('\')[-1])" } | Out-File -Encoding ascii dist\SHA256SUMS.txt
