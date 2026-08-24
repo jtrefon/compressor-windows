@@ -113,6 +113,19 @@ jobs:
         if (-not $r.StartsWith("OK")) { throw "UI archive extract failed: $r" }
         $extracted = Get-ChildItem ui_extract_dir -Recurse -File | Select-Object -First 1
         if (-not $extracted) { throw "UI archive extract produced no files" }
+        # Single-file .cpz streams must verify in the archive section too
+        # (the app's own default compression output - regression for the
+        # "invalid magic / different archive type" confusion).
+        $p = Start-Process -FilePath $exe -ArgumentList @("--uitest","archive-verify","--in","ui_out.cpz","--result","ui_stream_verify.result") -PassThru -NoNewWindow
+        if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "UI stream verify timed out" }
+        $r = Get-Content "ui_stream_verify.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "UI stream verify failed: $r" }
+        $p = Start-Process -FilePath $exe -ArgumentList @("--uitest","archive-extract","--in","ui_out.cpz","--out","ui_stream_extract","--entry","0","--result","ui_stream_extract.result") -PassThru -NoNewWindow
+        if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "UI stream extract timed out" }
+        $r = Get-Content "ui_stream_extract.result" -ErrorAction Stop
+        if (-not $r.StartsWith("OK")) { throw "UI stream extract failed: $r" }
+        $back = Get-ChildItem ui_stream_extract -Recurse -File | Select-Object -First 1
+        if (-not $back) { throw "UI stream extract produced no files" }
         Write-Host "ARCHIVE TESTS OK"
         exit 0
         $p = Invoke-App @("archive","verify","headless_test.cza")

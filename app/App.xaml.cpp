@@ -267,6 +267,7 @@ int RunUiTest(const std::vector<std::wstring> &args) {
     const bool finished =
         status.find(L"Compressed") != std::wstring::npos ||
         status.find(L"Decompressed") != std::wstring::npos ||
+        status.find(L"Stream verified") != std::wstring::npos ||
         status.find(L"Archive") != std::wstring::npos ||
         status.find(L"Extracted") != std::wstring::npos ||
         status.find(L"error") != std::wstring::npos ||
