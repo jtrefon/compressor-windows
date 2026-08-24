@@ -15,7 +15,7 @@
 namespace updates {
 
 // Bump with every release tag (kept in sync with docs/RELEASING.md).
-inline constexpr wchar_t kAppVersion[] = L"0.1.9";
+inline constexpr wchar_t kAppVersion[] = L"0.1.10";
 
 struct UpdateInfo {
   bool available = false;
