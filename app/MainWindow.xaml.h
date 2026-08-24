@@ -79,5 +79,7 @@ private:
   std::shared_ptr<compression::events::EventBus> bus_;
   std::shared_ptr<compression::events::IEventListener> listener_;
   std::vector<compression::archive::ArchiveEntry> entries_;
+  bool streamMode_ = false;  // archive section is holding a single-file .cpz
+  std::wstring streamName_;  // original file name of that stream
 };
 } // namespace winrt::CompressorWindows::implementation

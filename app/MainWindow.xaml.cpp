@@ -553,8 +553,10 @@ std::wstring MainWindow::PickArchiveFile(HWND hwnd) {
                                         IID_PPV_ARGS(dlg.put())));
   winrt::check_hresult(dlg->SetOptions(FOS_FORCEFILESYSTEM));
   const COMDLG_FILTERSPEC types[] = {
-      {L"Compressor archives", L"*.cza"}, {L"All files", L"*.*"}};
-  winrt::check_hresult(dlg->SetFileTypes(2, types));
+      {L"Compressor archives", L"*.cza"},
+      {L"Compressor streams", L"*.cpz"},
+      {L"All files", L"*.*"}};
+  winrt::check_hresult(dlg->SetFileTypes(3, types));
   if (FAILED(dlg->Show(hwnd))) {
     return L"";
   }
@@ -711,13 +713,34 @@ bool MainWindow::DoArchiveCreate(const std::wstring &outPath,
 
 bool MainWindow::DoArchiveOpen(const std::wstring &archivePath) {
   try {
-    // A single-file stream (.cpz) is not a .cza archive — say so instead of
-    // showing a cryptic "invalid magic" error.
-    if (std::filesystem::path(archivePath).extension().wstring() == L".cpz") {
-      SetArchiveStatus(
-          L"This is a single-file .cpz stream, not a .cza archive. "
-          L"Open it with Decompress in the section above.");
-      return false;
+    const std::filesystem::path p(archivePath);
+    streamMode_ = false;
+    streamName_.clear();
+    if (p.extension().wstring() == L".cpz") {
+      // Single-file stream: verify by decompressing to a temp location.
+      streamMode_ = true;
+      streamName_ = p.stem().wstring();  // original name without .cpz
+      std::error_code ec;
+      const auto tmp =
+          std::filesystem::temp_directory_path() / L"CompressorWindowsVerify";
+      std::filesystem::create_directories(tmp, ec);
+      const auto tmpOut = tmp / p.filename().wstring();
+      compression::CompressionService service(bus_);
+      const auto r = service.decompressFile(p, tmpOut);
+      std::filesystem::remove_all(tmp, ec);
+      ArchiveEntries().Items().Clear();
+      entries_.clear();
+      wchar_t buf[256];
+      swprintf_s(buf, L"%ls  (%llu bytes compressed)", streamName_.c_str(),
+                 static_cast<unsigned long long>(r.inBytes));
+      ArchiveEntries().Items().Append(box_value(winrt::hstring{buf}));
+      swprintf_s(buf,
+                 L"Stream verified: %ls  |  %llu -> %llu bytes",
+                 r.verified ? L"OK" : L"FAILED",
+                 static_cast<unsigned long long>(r.inBytes),
+                 static_cast<unsigned long long>(r.outBytes));
+      SetArchiveStatus(buf);
+      return r.verified;
     }
     compression::ArchiveService archive(bus_);
     const auto listing = archive.list(std::filesystem::path(archivePath));
@@ -751,6 +774,22 @@ bool MainWindow::DoArchiveExtract(const std::wstring &archivePath,
                                   int32_t entryIndex,
                                   const std::wstring &outDir) {
   try {
+    if (streamMode_) {
+      // Single-file stream: extract = decompress to the chosen folder under
+      // the original file name.
+      const auto outFile =
+          std::filesystem::path(outDir) / streamName_;
+      compression::CompressionService service(bus_);
+      const auto r = service.decompressFile(
+          std::filesystem::path(archivePath), outFile);
+      wchar_t buf[256];
+      swprintf_s(buf, L"Extracted %llu -> %llu bytes, CRC verified: %ls",
+                 static_cast<unsigned long long>(r.inBytes),
+                 static_cast<unsigned long long>(r.outBytes),
+                 r.verified ? L"yes" : L"NO");
+      SetArchiveStatus(buf);
+      return r.verified;
+    }
     if (entryIndex < 0 ||
         entryIndex >= static_cast<int32_t>(entries_.size())) {
       SetArchiveStatus(L"Select an entry to extract.");
