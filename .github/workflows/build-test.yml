@@ -120,6 +120,7 @@ jobs:
         if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "UI stream verify timed out" }
         $r = Get-Content "ui_stream_verify.result" -ErrorAction Stop
         if (-not $r.StartsWith("OK")) { throw "UI stream verify failed: $r" }
+        New-Item -ItemType Directory -Force -Path ui_stream_extract | Out-Null
         $p = Start-Process -FilePath $exe -ArgumentList @("--uitest","archive-extract","--in","ui_out.cpz","--out","ui_stream_extract","--entry","0","--result","ui_stream_extract.result") -PassThru -NoNewWindow
         if (-not $p.WaitForExit(60000)) { Stop-Process -Id $p.Id -Force; throw "UI stream extract timed out" }
         $r = Get-Content "ui_stream_extract.result" -ErrorAction Stop
