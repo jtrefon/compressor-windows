@@ -6,6 +6,9 @@
 #include <compression/codec/CodecRegistry.hpp>
 
 #include <winrt/Windows.System.h>
+#include <winrt/Windows.Graphics.h>
+#include <winrt/Windows.UI.h>
+#include <winrt/Microsoft.UI.Windowing.h>
 
 #include <microsoft.ui.xaml.window.h>
 #include <shobjidl.h>
@@ -156,6 +159,7 @@ MainWindow::MainWindow() {
   bus_ = std::make_shared<compression::events::EventBus>();
   listener_ = std::make_shared<UiEventListener>(
       queue_, [this](uint8_t pct, uint64_t in, uint64_t out) {
+        Progress().IsIndeterminate(false);
         Progress().Value(pct);
         LiveStatusText().Text(winrt::hstring{FormatLiveStatus(pct, in, out)});
       });
@@ -167,6 +171,20 @@ MainWindow::MainWindow() {
   if (icon != nullptr) {
     SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon));
     SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon));
+  }
+
+  // Window fits the content (no dead space).
+  try {
+    AppWindow().Resize(winrt::Windows::Graphics::SizeInt32{640, 780});
+  } catch (...) {
+  }
+
+  // Title bar follows the app theme (dark mode incl. the top bar).
+  try {
+    ApplyTitleBarTheme();
+    Content().ActualThemeChanged(
+        [this](auto const &, auto const &) { ApplyTitleBarTheme(); });
+  } catch (...) {
   }
 
   VersionText().Text(winrt::hstring{L"version "} +
@@ -248,16 +266,81 @@ void MainWindow::SetArchiveStatus(std::wstring text) {
   }
 }
 
+// Dark mode must reach the native title bar too (default: white even in dark
+// theme). Colors are set explicitly for both themes.
+void MainWindow::ApplyTitleBarTheme() {
+  const auto titleBar = AppWindow().TitleBar();
+  if (titleBar == nullptr) {
+    return;
+  }
+  const bool dark = Content().ActualTheme() == ElementTheme::Dark;
+  const auto color = [&](uint8_t r, uint8_t g, uint8_t b) {
+    return winrt::Windows::UI::Color{255, r, g, b};
+  };
+  if (dark) {
+    titleBar.BackgroundColor(color(0x1F, 0x1F, 0x1F));
+    titleBar.ForegroundColor(color(0xFF, 0xFF, 0xFF));
+    titleBar.ButtonBackgroundColor(color(0x1F, 0x1F, 0x1F));
+    titleBar.ButtonForegroundColor(color(0xFF, 0xFF, 0xFF));
+    titleBar.ButtonHoverBackgroundColor(color(0x35, 0x35, 0x35));
+    titleBar.ButtonHoverForegroundColor(color(0xFF, 0xFF, 0xFF));
+    titleBar.ButtonPressedBackgroundColor(color(0x45, 0x45, 0x45));
+    titleBar.ButtonPressedForegroundColor(color(0xFF, 0xFF, 0xFF));
+    titleBar.InactiveBackgroundColor(color(0x1F, 0x1F, 0x1F));
+    titleBar.InactiveForegroundColor(color(0x9A, 0x9A, 0x9A));
+    titleBar.ButtonInactiveBackgroundColor(color(0x1F, 0x1F, 0x1F));
+    titleBar.ButtonInactiveForegroundColor(color(0x9A, 0x9A, 0x9A));
+  } else {
+    titleBar.BackgroundColor(color(0xFF, 0xFF, 0xFF));
+    titleBar.ForegroundColor(color(0x1F, 0x1F, 0x1F));
+    titleBar.ButtonBackgroundColor(color(0xFF, 0xFF, 0xFF));
+    titleBar.ButtonForegroundColor(color(0x1F, 0x1F, 0x1F));
+    titleBar.ButtonHoverBackgroundColor(color(0xF3, 0xF3, 0xF3));
+    titleBar.ButtonHoverForegroundColor(color(0x1F, 0x1F, 0x1F));
+    titleBar.ButtonPressedBackgroundColor(color(0xE5, 0xE5, 0xE5));
+    titleBar.ButtonPressedForegroundColor(color(0x1F, 0x1F, 0x1F));
+    titleBar.InactiveBackgroundColor(color(0xFF, 0xFF, 0xFF));
+    titleBar.InactiveForegroundColor(color(0x9A, 0x9A, 0x9A));
+    titleBar.ButtonInactiveBackgroundColor(color(0xFF, 0xFF, 0xFF));
+    titleBar.ButtonInactiveForegroundColor(color(0x9A, 0x9A, 0x9A));
+  }
+}
+
+// Hands-off UX: the output is derived from the input (same folder, same
+// name, right extension) and only overridden if the user picks one.
+std::wstring MainWindow::DefaultOutputPath(const std::wstring &inPath,
+                                           bool compress) {
+  const std::filesystem::path p(inPath);
+  if (compress) {
+    return (p.parent_path() / (p.stem().wstring() + L".cpz")).wstring();
+  }
+  if (p.extension().wstring() == L".cpz") {
+    return (p.parent_path() / p.stem()).wstring();
+  }
+  return (p.parent_path() / (p.stem().wstring() + L".decompressed")).wstring();
+}
+
+void MainWindow::PrefillOutputFromInput(const std::wstring &inPath,
+                                        bool compress) {
+  OutputPath().Text(winrt::hstring{DefaultOutputPath(inPath, compress)});
+}
+
 void MainWindow::Run(bool compress) {
   if (busy_) {
     SetStatus(L"An operation is already running.");
     return;
   }
   const std::wstring inPath(InputPath().Text());
-  const std::wstring outPath(OutputPath().Text());
-  if (inPath.empty() || outPath.empty()) {
-    SetStatus(L"Choose an input and an output file first.");
+  if (inPath.empty()) {
+    SetStatus(L"Choose an input file first.");
     return;
+  }
+  // Output is optional: default to the input's folder with the right name
+  // and extension unless the user picked one explicitly.
+  std::wstring outPath(OutputPath().Text());
+  if (outPath.empty()) {
+    outPath = DefaultOutputPath(inPath, compress);
+    OutputPath().Text(winrt::hstring{outPath});
   }
 
   const int index = static_cast<int>(StrategyCombo().SelectedIndex());
@@ -276,8 +359,11 @@ void MainWindow::Run(bool compress) {
   CompressBtn().IsEnabled(false);
   DecompressBtn().IsEnabled(false);
   CancelBtn().IsEnabled(true);
+  Progress().IsIndeterminate(true);
   Progress().Value(0);
-  LiveStatusText().Text(L"");
+  LiveStatusText().Text(winrt::hstring{
+      compress ? L"Compressing... starting up" : L"Decompressing... starting up"});
+  SetStatus(L"Preparing...");
 
   // Engine work runs off the UI thread; results marshal back via the
   // DispatcherQueue.
@@ -328,6 +414,7 @@ void MainWindow::Run(bool compress) {
     queue_.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueueHandler{
         [this]() {
           busy_ = false;
+          Progress().IsIndeterminate(false);
           CompressBtn().IsEnabled(true);
           DecompressBtn().IsEnabled(true);
           CancelBtn().IsEnabled(false);
@@ -375,6 +462,8 @@ void MainWindow::OnBrowseInClick(IInspectable const &, RoutedEventArgs const &) 
   const auto files = PickFiles(WindowHandle(*this), false, false);
   if (!files.empty()) {
     InputPath().Text(winrt::hstring{files[0]});
+    PrefillOutputFromInput(files[0], true);
+    SetStatus(L"Output defaults to: " + DefaultOutputPath(files[0], true));
   }
 }
 
@@ -385,11 +474,28 @@ void MainWindow::OnBrowseOutClick(IInspectable const &, RoutedEventArgs const &)
   }
 }
 
+std::wstring MainWindow::PickArchiveFile(HWND hwnd) {
+  winrt::com_ptr<IFileOpenDialog> dlg;
+  winrt::check_hresult(CoCreateInstance(CLSID_FileOpenDialog, nullptr,
+                                        CLSCTX_INPROC_SERVER,
+                                        IID_PPV_ARGS(dlg.put())));
+  winrt::check_hresult(dlg->SetOptions(FOS_FORCEFILESYSTEM));
+  const COMDLG_FILTERSPEC types[] = {
+      {L"Compressor archives", L"*.cza"}, {L"All files", L"*.*"}};
+  winrt::check_hresult(dlg->SetFileTypes(2, types));
+  if (FAILED(dlg->Show(hwnd))) {
+    return L"";
+  }
+  winrt::com_ptr<IShellItem> item;
+  winrt::check_hresult(dlg->GetResult(item.put()));
+  return ShellItemPath(item.get());
+}
+
 void MainWindow::OnBrowseArchiveClick(IInspectable const &,
                                       RoutedEventArgs const &) {
-  const auto files = PickFiles(WindowHandle(*this), false, false);
-  if (!files.empty()) {
-    ArchivePath().Text(winrt::hstring{files[0]});
+  const std::wstring path = PickArchiveFile(WindowHandle(*this));
+  if (!path.empty()) {
+    ArchivePath().Text(winrt::hstring{path});
   }
 }
 
@@ -399,10 +505,12 @@ void MainWindow::OnCreateArchiveClick(IInspectable const &,
   if (paths.empty()) {
     return;
   }
-  const std::wstring outPath(ArchivePath().Text());
+  std::wstring outPath(ArchivePath().Text());
   if (outPath.empty()) {
-    SetArchiveStatus(L"Choose an archive file first.");
-    return;
+    // Hands-off default: same folder + same name as the first picked file.
+    const std::filesystem::path first(paths[0]);
+    outPath = (first.parent_path() / (first.stem().wstring() + L".cza")).wstring();
+    ArchivePath().Text(winrt::hstring{outPath});
   }
   DoArchiveCreate(outPath, paths);
 }
@@ -457,11 +565,21 @@ void MainWindow::OnDrop(IInspectable const &,
     }
     if (!first.empty()) {
       InputPath().Text(winrt::hstring{first});
-      if (items.Size() > 1) {
-        SetStatus(L"Dropped " + std::to_wstring(items.Size()) +
-                  L" files - use the Archive section to bundle them.");
+      const std::filesystem::path p(first);
+      if (p.extension().wstring() == L".cza") {
+        // Dropped archive: load it into the archive section directly.
+        ArchivePath().Text(winrt::hstring{first});
+        SetStatus(L"Archive loaded, verifying...");
+        DoArchiveOpen(first);
       } else {
-        SetStatus(L"File loaded from drop.");
+        PrefillOutputFromInput(first, true);
+        if (items.Size() > 1) {
+          SetStatus(L"Dropped " + std::to_wstring(items.Size()) +
+                    L" files - use the Archive section to bundle them.");
+        } else {
+          SetStatus(L"File loaded from drop. Output defaults to: " +
+                    DefaultOutputPath(first, true));
+        }
       }
     }
   } catch (...) {
@@ -471,7 +589,15 @@ void MainWindow::OnDrop(IInspectable const &,
 
 void MainWindow::PrefillInput(const std::wstring &path) {
   InputPath().Text(winrt::hstring{path});
-  SetStatus(L"File opened: " + path);
+  const std::filesystem::path p(path);
+  if (p.extension().wstring() == L".cza") {
+    ArchivePath().Text(winrt::hstring{path});
+    SetStatus(L"Archive opened: " + path);
+    DoArchiveOpen(path);
+  } else {
+    PrefillOutputFromInput(path, true);
+    SetStatus(L"File opened: " + path);
+  }
 }
 
 // --- Archive operations (also used by the --uitest harness) ---
@@ -513,6 +639,14 @@ bool MainWindow::DoArchiveCreate(const std::wstring &outPath,
 
 bool MainWindow::DoArchiveOpen(const std::wstring &archivePath) {
   try {
+    // A single-file stream (.cpz) is not a .cza archive — say so instead of
+    // showing a cryptic "invalid magic" error.
+    if (std::filesystem::path(archivePath).extension().wstring() == L".cpz") {
+      SetArchiveStatus(
+          L"This is a single-file .cpz stream, not a .cza archive. "
+          L"Open it with Decompress in the section above.");
+      return false;
+    }
     compression::ArchiveService archive(bus_);
     const auto listing = archive.list(std::filesystem::path(archivePath));
     entries_ = listing.entries;

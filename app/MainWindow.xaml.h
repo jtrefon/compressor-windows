@@ -61,6 +61,10 @@ struct MainWindow : MainWindowT<MainWindow> {
 private:
   void Run(bool compress);
   std::wstring FormatLiveStatus(uint8_t pct, uint64_t in, uint64_t out);
+  std::wstring DefaultOutputPath(const std::wstring &inPath, bool compress);
+  std::wstring PickArchiveFile(HWND hwnd);
+  void PrefillOutputFromInput(const std::wstring &inPath, bool compress);
+  void ApplyTitleBarTheme();
   void SetStatus(std::wstring text);
   void SetArchiveStatus(std::wstring text);
 
