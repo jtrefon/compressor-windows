@@ -10,6 +10,7 @@
 
 #include <winrt/Windows.Foundation.h>
 
+#include <functional>
 #include <string>
 
 namespace updates {
@@ -33,5 +34,11 @@ bool IsNewerVersion(const std::wstring &current, const std::wstring &candidate);
 // newer release exists. Never throws on network/parse failures - returns
 // false instead.
 winrt::Windows::Foundation::IAsyncOperation<bool> CheckForUpdate(UpdateInfo &out);
+
+// Downloads the installer asset to @p destPath, reporting progress as
+// (bytesDone, bytesTotal). Returns false on HTTP or IO failures.
+winrt::Windows::Foundation::IAsyncOperation<bool> DownloadInstaller(
+    const std::wstring &url, const std::wstring &destPath,
+    std::function<void(uint64_t, uint64_t)> progress);
 
 } // namespace updates

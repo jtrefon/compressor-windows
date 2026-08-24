@@ -2,8 +2,10 @@
 #include "UpdateService.h"
 
 #include <winrt/Windows.Data.Json.h>
+#include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Web.Http.h>
 
+#include <fstream>
 #include <vector>
 
 namespace updates {
@@ -78,6 +80,49 @@ winrt::Windows::Foundation::IAsyncOperation<bool> CheckForUpdate(UpdateInfo &out
     // Network/parse failures are non-fatal: report no update.
   }
   co_return out.available;
+}
+
+winrt::Windows::Foundation::IAsyncOperation<bool> DownloadInstaller(
+    const std::wstring &url, const std::wstring &destPath,
+    std::function<void(uint64_t, uint64_t)> progress) {
+  try {
+    winrt::Windows::Web::Http::HttpClient client;
+    client.DefaultRequestHeaders().UserAgent().ParseAdd(L"CompressorWindows");
+    const winrt::Windows::Foundation::Uri uri(url);
+    const auto response = co_await client.GetAsync(
+        uri, winrt::Windows::Web::Http::HttpCompletionOption::ResponseHeadersRead);
+    if (!response.IsSuccessStatusCode()) {
+      co_return false;
+    }
+    const auto stream = co_await response.Content().ReadAsInputStreamAsync();
+    winrt::Windows::Storage::Streams::Buffer buffer{65536};
+    std::ofstream out(destPath, std::ios::binary | std::ios::trunc);
+    if (!out) {
+      co_return false;
+    }
+    uint64_t done = 0;
+    const auto lengthRef = response.Content().Headers().ContentLength();
+    const uint64_t total = lengthRef ? lengthRef.Value() : 0ull;
+    while (true) {
+      const auto read = co_await stream.ReadAsync(
+          buffer, 65536,
+          winrt::Windows::Storage::Streams::InputStreamOptions::None);
+      const auto n = read.Length();
+      if (n == 0) {
+        break;
+      }
+      out.write(reinterpret_cast<const char *>(read.data()),
+                static_cast<std::streamsize>(n));
+      done += n;
+      if (progress) {
+        progress(done, total);
+      }
+    }
+    out.close();
+    co_return out.good();
+  } catch (...) {
+    co_return false;
+  }
 }
 
 } // namespace updates

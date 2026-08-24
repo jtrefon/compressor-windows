@@ -12,10 +12,12 @@
 
 #include <microsoft.ui.xaml.window.h>
 #include <shobjidl.h>
+#include <shellapi.h>
 
 using namespace compression;
 
 #include <cstdint>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
@@ -221,18 +223,21 @@ winrt::Windows::Foundation::IAsyncAction MainWindow::CheckForUpdatesAsync(bool s
   const bool available = co_await updates::CheckForUpdate(info);
   winrt::Microsoft::UI::Xaml::Controls::ContentDialog dialog;
   dialog.XamlRoot(Content().XamlRoot());
-  if (info.available) {
+  if (available) {
     dialog.Title(winrt::box_value(winrt::hstring{L"Update available: "} +
                                   winrt::hstring{info.version}));
     dialog.Content(winrt::box_value(winrt::hstring{info.notes.empty() ? L"A new version is available." : info.notes}));
-    dialog.PrimaryButtonText(L"Download");
+    dialog.PrimaryButtonText(L"Update now");
     dialog.CloseButtonText(L"Later");
     dialog.DefaultButton(winrt::Microsoft::UI::Xaml::Controls::ContentDialogButton::Primary);
     const auto result = co_await dialog.ShowAsync();
-    if (result == winrt::Microsoft::UI::Xaml::Controls::ContentDialogResult::Primary &&
-        !info.downloadUrl.empty()) {
-      co_await winrt::Windows::System::Launcher::LaunchUriAsync(
-          winrt::Windows::Foundation::Uri{info.downloadUrl});
+    if (result == winrt::Microsoft::UI::Xaml::Controls::ContentDialogResult::Primary) {
+      if (!info.downloadUrl.empty()) {
+        co_await DownloadAndInstallUpdateAsync(info);
+      } else {
+        co_await winrt::Windows::System::Launcher::LaunchUriAsync(
+            winrt::Windows::Foundation::Uri{info.pageUrl});
+      }
     }
   } else if (showWhenCurrent) {
     dialog.Title(winrt::box_value(winrt::hstring{L"You are up to date"}));
@@ -241,6 +246,72 @@ winrt::Windows::Foundation::IAsyncAction MainWindow::CheckForUpdatesAsync(bool s
                                     L" is the latest release."));
     dialog.CloseButtonText(L"OK");
     co_await dialog.ShowAsync();
+  }
+}
+
+// Downloads the installer in-app, then offers to run it (the app closes so
+// the installer can replace the running executable).
+winrt::Windows::Foundation::IAsyncAction MainWindow::DownloadAndInstallUpdateAsync(
+    const updates::UpdateInfo &info) {
+  const std::wstring dest =
+      (std::filesystem::temp_directory_path() /
+       (L"CompressorWindows-" + info.version + L"-setup.exe")).wstring();
+  Progress().IsIndeterminate(true);
+  SetStatus(L"Downloading update " + info.version + L"...");
+  const bool ok = co_await updates::DownloadInstaller(
+      info.downloadUrl, dest, [this](uint64_t done, uint64_t total) {
+        wchar_t buf[128];
+        if (total > 0) {
+          swprintf_s(buf, L"Downloading update... %llu / %llu KB (%u%%)",
+                     static_cast<unsigned long long>(done / 1024),
+                     static_cast<unsigned long long>(total / 1024),
+                     static_cast<unsigned>(done * 100 / total));
+        } else {
+          swprintf_s(buf, L"Downloading update... %llu KB",
+                     static_cast<unsigned long long>(done / 1024));
+        }
+        StatusText().Text(winrt::hstring{buf});
+      });
+  Progress().IsIndeterminate(false);
+  if (!ok) {
+    winrt::Microsoft::UI::Xaml::Controls::ContentDialog fail;
+    fail.XamlRoot(Content().XamlRoot());
+    fail.Title(winrt::box_value(winrt::hstring{L"Download failed"}));
+    fail.Content(winrt::box_value(
+        winrt::hstring{L"The installer could not be downloaded. "
+                       L"You can open the release page in your browser instead."}));
+    fail.PrimaryButtonText(L"Open release page");
+    fail.CloseButtonText(L"Close");
+    const auto r = co_await fail.ShowAsync();
+    if (r == winrt::Microsoft::UI::Xaml::Controls::ContentDialogResult::Primary &&
+        !info.pageUrl.empty()) {
+      co_await winrt::Windows::System::Launcher::LaunchUriAsync(
+          winrt::Windows::Foundation::Uri{info.pageUrl});
+    }
+    SetStatus(L"");
+    co_return;
+  }
+  winrt::Microsoft::UI::Xaml::Controls::ContentDialog ready;
+  ready.XamlRoot(Content().XamlRoot());
+  ready.Title(winrt::box_value(winrt::hstring{L"Update ready"}));
+  ready.Content(winrt::box_value(
+      winrt::hstring{L"Update " + info.version +
+                     L" is downloaded. The app will close and the installer "
+                     L"will run to complete the update."}));
+  ready.PrimaryButtonText(L"Install now");
+  ready.CloseButtonText(L"Later");
+  ready.DefaultButton(winrt::Microsoft::UI::Xaml::Controls::ContentDialogButton::Primary);
+  const auto r = co_await ready.ShowAsync();
+  SetStatus(L"");
+  if (r == winrt::Microsoft::UI::Xaml::Controls::ContentDialogResult::Primary) {
+    ShellExecuteW(nullptr, L"open", dest.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    // Give the installer a moment to start, then exit so it can replace the
+    // running exe (a running process locks its own file).
+    std::thread([this]() {
+      std::this_thread::sleep_for(std::chrono::seconds(2));
+      queue_.TryEnqueue(winrt::Microsoft::UI::Dispatching::DispatcherQueueHandler{
+          []() { winrt::Microsoft::UI::Xaml::Application::Current().Exit(); }});
+    }).detach();
   }
 }
 

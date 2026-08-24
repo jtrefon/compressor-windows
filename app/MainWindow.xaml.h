@@ -43,6 +43,8 @@ struct MainWindow : MainWindowT<MainWindow> {
   void OnCheckUpdatesClick(winrt::Windows::Foundation::IInspectable const &,
                            winrt::Microsoft::UI::Xaml::RoutedEventArgs const &);
   winrt::Windows::Foundation::IAsyncAction CheckForUpdatesAsync(bool showWhenCurrent);
+  winrt::Windows::Foundation::IAsyncAction DownloadAndInstallUpdateAsync(
+      const updates::UpdateInfo &info);
   void OnCancelClick(winrt::Windows::Foundation::IInspectable const &,
                      winrt::Microsoft::UI::Xaml::RoutedEventArgs const &);
   void OnDragOver(winrt::Windows::Foundation::IInspectable const &,
