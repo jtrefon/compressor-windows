@@ -108,56 +108,37 @@ jobs:
         Write-Host "INSTALLER VERIFICATION OK"
 
     # --- Signing: prefer SignPath (free OSS), fall back to PFX, then unsigned ---
-    - name: Upload artifacts for signing
-      if: ${{ env.SIGNPATH_API_TOKEN != '' }}
-      id: upload
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-build
-        path: |
-          dist/CompressorWindows/CompressorWindows.exe
-          CompressorWindows-${{ github.ref_name }}-setup.exe
-        retention-days: 1
-        archive: false
-
-    - name: Sign via SignPath Foundation
-      if: ${{ env.SIGNPATH_API_TOKEN != '' }}
-      id: signpath
-      uses: signpath/github-action-submit-signing-request@v2
-      with:
-        api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-        organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
-        project-slug: Windows_Compressor
-        signing-policy-slug: Windows_Compressor
-        github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
-        artifact-configuration-slug: initial
-        wait-for-completion: true
-        output-artifact-directory: signed
-        skip-decompress: true
-
-    - name: Apply signed artifacts (SignPath)
+    - name: Sign via SignPath PowerShell module
       if: ${{ env.SIGNPATH_API_TOKEN != '' }}
       shell: pwsh
       run: |
-        $signed = "signed"
-        if (-not (Test-Path "$signed")) { throw "SignPath output directory missing" }
-        # Replace unsigned exe with signed version
-        $signedExe = Get-ChildItem "$signed\CompressorWindows.exe" -ErrorAction SilentlyContinue
-        if ($signedExe) {
-          Copy-Item $signedExe.FullName "dist\CompressorWindows\CompressorWindows.exe" -Force
-          Write-Host "APPLIED SIGNED EXE"
-        } else {
-          Write-Host "WARNING: signed exe not found in SignPath output"
-        }
-        # Replace unsigned installer with signed version
-        $signedSetup = Get-ChildItem "$signed\*setup.exe" -ErrorAction SilentlyContinue
-        if ($signedSetup) {
-          Copy-Item $signedSetup.FullName "CompressorWindows-${{ github.ref_name }}-setup.exe" -Force
-          Write-Host "APPLIED SIGNED INSTALLER"
-        } else {
-          Write-Host "WARNING: signed installer not found in SignPath output"
-        }
-        # Repackage portable zip with signed exe
+        $ErrorActionPreference = "Stop"
+        $org = $env:SIGNPATH_ORG_ID
+        $token = $env:SIGNPATH_API_TOKEN
+        $project = "Windows_Compressor"
+        $policy = "Windows_Compressor"
+        $config = "initial"
+        Install-Module -Name SignPath -Scope CurrentUser -Force -AllowClobber
+        Import-Module SignPath
+        New-Item -ItemType Directory -Force -Path signed | Out-Null
+        Write-Host "Submitting exe for signing..."
+        Submit-SigningRequest `
+          -InputArtifactPath "dist\CompressorWindows\CompressorWindows.exe" `
+          -ProjectSlug $project -SigningPolicySlug $policy -ArtifactConfigurationSlug $config `
+          -WaitForCompletion -Force `
+          -OutputArtifactPath "signed\CompressorWindows.exe" `
+          -OrganizationId $org -ApiToken $token
+        Write-Host "EXE SIGNED OK"
+        Write-Host "Submitting installer for signing..."
+        Submit-SigningRequest `
+          -InputArtifactPath "CompressorWindows-${{ github.ref_name }}-setup.exe" `
+          -ProjectSlug $project -SigningPolicySlug $policy -ArtifactConfigurationSlug $config `
+          -WaitForCompletion -Force `
+          -OutputArtifactPath "signed\CompressorWindows-${{ github.ref_name }}-setup.exe" `
+          -OrganizationId $org -ApiToken $token
+        Write-Host "INSTALLER SIGNED OK"
+        Copy-Item "signed\CompressorWindows.exe" "dist\CompressorWindows\CompressorWindows.exe" -Force
+        Copy-Item "signed\CompressorWindows-${{ github.ref_name }}-setup.exe" "CompressorWindows-${{ github.ref_name }}-setup.exe" -Force
         Compress-Archive -Path dist\CompressorWindows -DestinationPath dist\CompressorWindows-${{ github.ref_name }}.zip -Force
         Write-Host "REPACKAGED ZIP WITH SIGNED EXE"
 
