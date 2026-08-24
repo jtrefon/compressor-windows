@@ -182,7 +182,7 @@ MainWindow::MainWindow() {
   // Title bar follows the app theme (dark mode incl. the top bar).
   try {
     ApplyTitleBarTheme();
-    Content().ActualThemeChanged(
+    Content().as<FrameworkElement>().ActualThemeChanged(
         [this](auto const &, auto const &) { ApplyTitleBarTheme(); });
   } catch (...) {
   }
@@ -273,7 +273,8 @@ void MainWindow::ApplyTitleBarTheme() {
   if (titleBar == nullptr) {
     return;
   }
-  const bool dark = Content().ActualTheme() == ElementTheme::Dark;
+  const bool dark =
+      Content().as<FrameworkElement>().ActualTheme() == ElementTheme::Dark;
   const auto color = [&](uint8_t r, uint8_t g, uint8_t b) {
     return winrt::Windows::UI::Color{255, r, g, b};
   };
